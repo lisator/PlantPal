@@ -57,7 +57,6 @@ class DefaultFirebaseOptions {
     projectId: 'plantpal-b6a3c',
     storageBucket: 'plantpal-b6a3c.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyC7AmiG7glshTgtocuMWVKpfDT3p1tblz4',
     appId: '1:683680706564:ios:cb644735ae90145d218551',
@@ -66,7 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'plantpal-b6a3c.firebasestorage.app',
     iosBundleId: 'com.example.plantpal',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyC7AmiG7glshTgtocuMWVKpfDT3p1tblz4',
     appId: '1:683680706564:ios:cb644735ae90145d218551',
