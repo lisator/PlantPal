@@ -1,13 +1,10 @@
-import 'dart:typed_data';
+
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'firebase_options.dart';
-import 'widgets/reusable_widgets.dart';
-import 'services/plant_api_service.dart';
 import 'screens/home_screen.dart';
 
 Future<void> main() async {
