@@ -26,3 +26,21 @@ yarn-error.log*
 
 # Environment files (local configs)
 /.env.*
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# IDE
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+# Widget Preview related
+.widget_preview/
