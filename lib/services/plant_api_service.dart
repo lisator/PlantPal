@@ -25,6 +25,7 @@ class PlantApiService {
           base64Image,
         ],
         'similar_images': true,
+        'health': 'all',
       }),
     );
 

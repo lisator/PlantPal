@@ -17,6 +17,8 @@ class _UploadScreenState extends State<UploadScreen> {
   String? _fileName;
   bool _isAnalyzing = false;
   String? _result;
+  String? _healthStatus;
+  List<String> _healthIssues = [];
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
@@ -35,6 +37,8 @@ class _UploadScreenState extends State<UploadScreen> {
       _imageBytes = bytes;
       _fileName = image.name;
       _result = null;
+      _healthStatus = null;
+      _healthIssues = [];
     });
   }
 
@@ -55,6 +59,8 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() {
       _isAnalyzing = true;
       _result = null;
+      _healthStatus = null;
+      _healthIssues = [];
     });
 
     try {
@@ -73,13 +79,34 @@ class _UploadScreenState extends State<UploadScreen> {
       final plantName = firstSuggestion['name'];
       final probability = firstSuggestion['probability'];
 
+      final isHealthy =
+          response['result']['is_healthy']['binary'];
+
+      final diseaseSuggestions =
+          (response['result']['disease']['suggestions'] as List?) ?? [];
+
+      final healthIssues = diseaseSuggestions.take(3).map((issue) {
+        final name = issue['name'];
+        final probability = issue['probability'];
+
+        return '$name - ${(probability * 100).toStringAsFixed(1)}%';
+      }).toList();
+
       setState(() {
         _result =
-            '$plantName - ${(probability * 100).toStringAsFixed(1)}%';
+          '$plantName - ${(probability * 100).toStringAsFixed(1)}%';
+
+        _healthStatus =
+          isHealthy ? 'Healthy' : 'Possible health issue';
+
+        _healthIssues = healthIssues;
       });
+
     } catch (e) {
       setState(() {
         _result = 'Error: $e';
+        _healthStatus = null;
+        _healthIssues = [];
       });
     } finally {
       setState(() {
@@ -139,6 +166,27 @@ class _UploadScreenState extends State<UploadScreen> {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+
+        const SizedBox(height: 16),
+
+        if (_healthStatus != null)
+          Text(
+            'Health Status: $_healthStatus',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+        const SizedBox(height: 8),
+
+        if (_healthIssues.isNotEmpty)
+          ..._healthIssues.map(
+            (issue) => Text(
+              '• $issue',
+              style: const TextStyle(fontSize: 16),
             ),
           ),
       ],
