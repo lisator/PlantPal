@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/reusable_widgets.dart';
 import 'my_plants_screen.dart';
 import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('PlantPal'),
       ),
+      drawer: const AppDrawer(),
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -64,20 +66,65 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final List<Map<String, dynamic>> _reminders = [
+    {
+      'message': 'Water your monstera today!',
+      'checked': false,
+    },
+    {
+      'message': 'Check the basil soil moisture.',
+      'checked': true,
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-        Text('Dashboard'),
-        SizedBox(height: 16),
-        Text('PlantPal home page'),
-        SizedBox(height: 16),
-        Text('Stats go here'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        //START OF REMINDERS CARD
+        Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Reminders',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (int i = 0; i < _reminders.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ReminderCard(
+                      message: _reminders[i]['message'],
+                      isChecked: _reminders[i]['checked'],
+                      onChanged: (value) {
+                        setState(() {
+                          _reminders[i]['checked'] = value ?? false;
+                        });
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ],
+      //SAVED PLANTS SECTION
     );
   }
 }
