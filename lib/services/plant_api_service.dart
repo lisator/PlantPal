@@ -4,41 +4,34 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class PlantApiService {
-  static const String baseUrl = 'https://api.plant.id/v3';
+  static const String workerUrl =
+      'https://plantpal-api.plantpal-breeze.workers.dev';
 
   Future<Map<String, dynamic>> identifyPlant({
-    required String apiKey,
     required Uint8List imageBytes,
   }) async {
-    final url = Uri.parse('$baseUrl/identification');
-
     final base64Image = base64Encode(imageBytes);
 
     final response = await http.post(
-      url,
+      Uri.parse(workerUrl),
       headers: {
-        'Api-Key': apiKey,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
-        'images': [
-          base64Image,
-        ],
-        'similar_images': true,
-        'health': 'all',
+        'image': base64Image,
       }),
     );
 
-    print('Plant ID status code: ${response.statusCode}');
-    print('Plant ID response: ${response.body}');
+    print('Worker status code: ${response.statusCode}');
+    print('Worker response: ${response.body}');
 
-    if (response.statusCode == 201 ||
-        response.statusCode == 200) {
+    if (response.statusCode == 200 ||
+        response.statusCode == 201) {
       return jsonDecode(response.body);
     }
 
     throw Exception(
-      'Plant identification failed: ${response.body}',
+      'Plant analysis failed: ${response.body}',
     );
   }
 }

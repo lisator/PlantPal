@@ -47,14 +47,6 @@ class _UploadScreenState extends State<UploadScreen> {
       return;
     }
 
-    const apiKey = String.fromEnvironment('PLANT_API_KEY');
-
-    if (apiKey.isEmpty) {
-      setState(() {
-        _result = 'API key was not provided.';
-      });
-      return;
-    }
 
     setState(() {
       _isAnalyzing = true;
@@ -67,7 +59,6 @@ class _UploadScreenState extends State<UploadScreen> {
       final plantApi = PlantApiService();
 
       final response = await plantApi.identifyPlant(
-        apiKey: apiKey,
         imageBytes: _imageBytes!,
       );
 
