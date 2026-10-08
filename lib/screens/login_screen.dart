@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'register_screen.dart';
+
+import '../services/auth_service.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
+import '../services/database_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +16,74 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+
+  final AuthService _authService = AuthService();
+  final DatabaseService _databaseService = DatabaseService();
+
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    final String email = emailController.text.trim();
+    final String password = passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email and password.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = await _authService.signInWithEmailAndPassword(
+        email,
+        password,
+      );
+
+      if (user == null) {
+        throw Exception('Unable to sign in.');
+      }
+      await _databaseService.ensureUserExists(
+        uid: user.uid,
+        email: user.email ?? email,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomeScreen(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login failed: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +133,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ForgotPasswordScreen(),
+                        builder: (context) =>
+                            const ForgotPasswordScreen(),
                       ),
                     );
                   },
@@ -75,30 +147,24 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const HomeScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('Login'),
+                  onPressed: _isLoading ? null : _login,
+                  child: _isLoading
+                      ? const CircularProgressIndicator()
+                      : const Text('Login'),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              const Text(
-                "Don't have an account?",
-              ),
+              const Text("Don't have an account?"),
 
               TextButton(
                 onPressed: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const RegisterScreen(),
+                      builder: (context) =>
+                          const RegisterScreen(),
                     ),
                   );
                 },

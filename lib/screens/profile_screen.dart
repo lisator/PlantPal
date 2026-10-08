@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/reusable_widgets.dart';
+import '../services/auth_service.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -107,8 +109,18 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 15),
 
             OutlinedButton(
-              onPressed: () {
-                // Logout will be connected to Firebase later.
+              onPressed: () async {
+                await AuthService().signOut();
+
+                if (!context.mounted) return;
+
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LoginScreen(),
+                  ),
+                  (route) => false,
+                );
               },
               child: const Text('Log Out'),
             ),
