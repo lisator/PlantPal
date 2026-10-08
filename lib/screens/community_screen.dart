@@ -5,15 +5,58 @@ class CommunityScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      children: const [
-        Text('Community'),
-        SizedBox(height: 16),
-        Text('Post 1'),
-        Text('Post 2'),
-        Text('Post 3'),
-      ],
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                // Add Post screen will be connected next.
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add Post'),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          const Icon(
+            Icons.local_florist,
+            size: 70,
+          ),
+
+          const SizedBox(height: 15),
+
+          const Text(
+            'Your feed is empty',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+            'Follow some plant friends to see their posts!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          ElevatedButton(
+            onPressed: () {
+              // Find Plant Friends will be added later.
+            },
+            child: const Text('Find Plant Friends'),
+          ),
+        ],
+      ),
     );
   }
 }
