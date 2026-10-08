@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../widgets/reusable_widgets.dart';
 import 'my_plants_screen.dart';
 import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
+import 'plant_care_screen.dart';
 import 'community_screen.dart';
+import '../models/models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,20 +18,24 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    MyPlantsScreen(),
-    UploadScreen(),
-    PlantSearch(),
-    CommunityScreen(),
+  late final List<Widget> _screens = [
+    DashboardScreen(onViewAllPlants: _showMyPlants),
+    const MyPlantsScreen(),
+    const UploadScreen(),
+    const PlantSearch(),
+    const CommunityScreen(),
   ];
+
+  void _showMyPlants() {
+    setState(() {
+      _selectedIndex = 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('PlantPal'),
-      ),
+      appBar: AppBar(title: const Text('PlantPal')),
       drawer: const AppDrawer(),
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
@@ -40,26 +47,17 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Dashboard',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
           BottomNavigationBarItem(
             icon: Icon(Icons.local_florist),
             label: 'My Plants',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.upload),
-            label: 'Upload',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
           BottomNavigationBarItem(
             icon: Icon(Icons.search),
             label: 'Plant Search',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Community',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Community'),
         ],
       ),
     );
@@ -67,7 +65,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, required this.onViewAllPlants});
+
+  final VoidCallback onViewAllPlants;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -75,14 +75,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final List<Map<String, dynamic>> _reminders = [
-    {
-      'message': 'Water your monstera today!',
-      'checked': false,
-    },
-    {
-      'message': 'Check the basil soil moisture.',
-      'checked': true,
-    },
+    {'message': 'Water your monstera today!', 'checked': false},
+    {'message': 'Check the basil soil moisture.', 'checked': true},
   ];
 
   @override
@@ -100,10 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Text(
                   'Reminders',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 for (int i = 0; i < _reminders.length; i++)
@@ -120,6 +111,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
               ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Saved plants', style: Theme.of(context).textTheme.titleLarge),
+            TextButton(
+              onPressed: widget.onViewAllPlants,
+              child: const Text('View all'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 94,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: savedPlants.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => PlantCard(
+              plant: savedPlants[index],
+              compact: true,
+              onTap: () => openPlantCarePage(context, savedPlants[index]),
             ),
           ),
         ),
