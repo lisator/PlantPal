@@ -12,15 +12,17 @@ class AuthService {
     String password,
   ) async {
     try {
-      UserCredential userCredential =
+      final UserCredential credential =
           await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      return userCredential.user;
+      return credential.user;
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.message ?? 'Unable to create account.');
+      throw Exception(
+        e.message ?? 'Unable to create account.',
+      );
     }
   }
 
@@ -29,22 +31,33 @@ class AuthService {
     String password,
   ) async {
     try {
-      UserCredential userCredential =
+      final UserCredential credential =
           await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      return userCredential.user;
+      return credential.user;
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.message ?? 'Unable to sign in.');
+      throw Exception(
+        e.message ?? 'Unable to sign in.',
+      );
     }
   }
-  Future<void> sendPasswordResetEmail(String email) async {
-    await _auth.sendPasswordResetEmail(
-      email: email.trim(),
-    );
-  } 
+
+  Future<void> sendPasswordResetEmail(
+    String email,
+  ) async {
+    try {
+      await _auth.sendPasswordResetEmail(
+        email: email.trim(),
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(
+        '${e.code}: ${e.message ?? 'Unable to send password reset email.'}',
+      );
+    }
+  }
 
   Future<void> signOut() async {
     await _auth.signOut();

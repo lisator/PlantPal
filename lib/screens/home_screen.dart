@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
+
 import '../widgets/reusable_widgets.dart';
+
+import 'community_screen.dart';
 import 'my_plants_screen.dart';
 import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
-import 'community_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+  });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() =>
+      _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState
+    extends State<HomeScreen> {
   int _selectedIndex = 0;
+
+  bool _showProfile = false;
 
   final List<Widget> _screens = const [
     DashboardScreen(),
@@ -23,41 +32,85 @@ class _HomeScreenState extends State<HomeScreen> {
     CommunityScreen(),
   ];
 
+  void _openProfile() {
+    setState(() {
+      _showProfile = true;
+    });
+  }
+
+  void _selectBottomTab(
+    int index,
+  ) {
+    setState(() {
+      _selectedIndex = index;
+      _showProfile = false;
+    });
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PlantPal'),
+        title: const Text(
+          'PlantPal',
+        ),
+        centerTitle: true,
       ),
-      drawer: const AppDrawer(),
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        type: BottomNavigationBarType.fixed,
-        onTap: (value) {
-          setState(() {
-            _selectedIndex = value;
-          });
-        },
+
+      drawer: AppDrawer(
+        onProfileTap: _openProfile,
+      ),
+
+      body: _showProfile
+          ? const ProfileScreen(
+              insideHome: true,
+            )
+          : _screens[_selectedIndex],
+
+      bottomNavigationBar:
+          BottomNavigationBar(
+        currentIndex:
+            _selectedIndex,
+        type:
+            BottomNavigationBarType.fixed,
+
+        onTap: _selectBottomTab,
+
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(
+              Icons.home,
+            ),
             label: 'Dashboard',
           ),
+
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_florist),
+            icon: Icon(
+              Icons.local_florist,
+            ),
             label: 'My Plants',
           ),
+
           BottomNavigationBarItem(
-            icon: Icon(Icons.upload),
+            icon: Icon(
+              Icons.upload,
+            ),
             label: 'Upload',
           ),
+
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
+            icon: Icon(
+              Icons.search,
+            ),
             label: 'Plant Search',
           ),
+
           BottomNavigationBarItem(
-            icon: Icon(Icons.people),
+            icon: Icon(
+              Icons.people,
+            ),
             label: 'Community',
           ),
         ],
@@ -66,55 +119,90 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+class DashboardScreen
+    extends StatefulWidget {
+  const DashboardScreen({
+    super.key,
+  });
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() =>
+      _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  final List<Map<String, dynamic>> _reminders = [
+class _DashboardScreenState
+    extends State<DashboardScreen> {
+  final List<Map<String, dynamic>>
+      _reminders = [
     {
-      'message': 'Water your monstera today!',
+      'message':
+          'Water your monstera today!',
       'checked': false,
     },
     {
-      'message': 'Check the basil soil moisture.',
+      'message':
+          'Check the basil soil moisture.',
       'checked': true,
     },
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding:
+          const EdgeInsets.all(16),
       children: [
-        //START OF REMINDERS CARD
         Card(
           elevation: 2,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding:
+                const EdgeInsets.all(
+              16,
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Reminders',
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 12),
-                for (int i = 0; i < _reminders.length; i++)
+
+                const SizedBox(
+                  height: 12,
+                ),
+
+                for (
+                  int i = 0;
+                  i < _reminders.length;
+                  i++
+                )
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding:
+                        const EdgeInsets
+                            .only(
+                      bottom: 12,
+                    ),
                     child: ReminderCard(
-                      message: _reminders[i]['message'],
-                      isChecked: _reminders[i]['checked'],
-                      onChanged: (value) {
+                      message:
+                          _reminders[i]
+                              ['message'],
+                      isChecked:
+                          _reminders[i]
+                              ['checked'],
+                      onChanged:
+                          (value) {
                         setState(() {
-                          _reminders[i]['checked'] = value ?? false;
+                          _reminders[i]
+                                  ['checked'] =
+                              value ??
+                                  false;
                         });
                       },
                     ),
@@ -124,7 +212,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
       ],
-      //SAVED PLANTS SECTION
     );
   }
 }

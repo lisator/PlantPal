@@ -1,19 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db =
+      FirebaseFirestore.instance;
 
-  // USERS 
+  // =========================================================
+  // USERS
+  // =========================================================
 
   Future<void> addUser({
     required String uid,
     required String email,
     required String displayName,
+    required String username,
   }) async {
     await _db.collection('users').doc(uid).set({
       'uid': uid,
       'email': email,
       'displayName': displayName,
+      'username': username,
+      'usernameLower': username.toLowerCase(),
+      'bio': '',
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -21,45 +28,288 @@ class DatabaseService {
   Future<DocumentSnapshot<Map<String, dynamic>>> getUser(
     String uid,
   ) async {
-    return await _db.collection('users').doc(uid).get();
+    return await _db
+        .collection('users')
+        .doc(uid)
+        .get();
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(
+    String uid,
+  ) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> getUsers() {
+    return _db
+        .collection('users')
+        .snapshots();
   }
 
   Future<void> updateUser({
     required String uid,
     required Map<String, dynamic> data,
   }) async {
-    await _db.collection('users').doc(uid).update(data);
+    await _db
+        .collection('users')
+        .doc(uid)
+        .update(data);
   }
 
+  Future<void> ensureUserExists({
+    required String uid,
+    required String email,
+    String displayName = '',
+  }) async {
+    final userRef =
+        _db.collection('users').doc(uid);
+
+    final userDocument =
+        await userRef.get();
+
+    if (!userDocument.exists) {
+      await userRef.set({
+        'uid': uid,
+        'email': email,
+        'displayName': displayName,
+        'username': '',
+        'usernameLower': '',
+        'bio': '',
+        'createdAt':
+            FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  Future<bool> isUsernameAvailable(
+    String username, {
+    String? currentUid,
+  }) async {
+    final usernameLower =
+        username.trim().toLowerCase();
+
+    final result = await _db
+        .collection('users')
+        .where(
+          'usernameLower',
+          isEqualTo: usernameLower,
+        )
+        .limit(1)
+        .get();
+
+    if (result.docs.isEmpty) {
+      return true;
+    }
+
+    if (currentUid != null &&
+        result.docs.first.id == currentUid) {
+      return true;
+    }
+
+    return false;
+  }
+
+  Future<void> updateProfile({
+    required String uid,
+    String? displayName,
+    String? username,
+    String? bio,
+  }) async {
+    final Map<String, dynamic> updates = {};
+
+    if (displayName != null) {
+      updates['displayName'] =
+          displayName.trim();
+    }
+
+    if (username != null) {
+      updates['username'] =
+          username.trim();
+
+      updates['usernameLower'] =
+          username.trim().toLowerCase();
+    }
+
+    if (bio != null) {
+      updates['bio'] =
+          bio.trim();
+    }
+
+    if (updates.isNotEmpty) {
+      await _db
+          .collection('users')
+          .doc(uid)
+          .update(updates);
+    }
+  }
+
+  // =========================================================
+  // FOLLOWING
+  // =========================================================
+
+  Future<void> followUser({
+    required String currentUserId,
+    required String targetUserId,
+  }) async {
+    if (currentUserId == targetUserId) {
+      return;
+    }
+
+    final batch = _db.batch();
+
+    final followingRef = _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('following')
+        .doc(targetUserId);
+
+    final followerRef = _db
+        .collection('users')
+        .doc(targetUserId)
+        .collection('followers')
+        .doc(currentUserId);
+
+    batch.set(
+      followingRef,
+      {
+        'userId': targetUserId,
+        'followedAt':
+            FieldValue.serverTimestamp(),
+      },
+    );
+
+    batch.set(
+      followerRef,
+      {
+        'userId': currentUserId,
+        'followedAt':
+            FieldValue.serverTimestamp(),
+      },
+    );
+
+    await batch.commit();
+  }
+
+  Future<void> unfollowUser({
+    required String currentUserId,
+    required String targetUserId,
+  }) async {
+    final batch = _db.batch();
+
+    final followingRef = _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('following')
+        .doc(targetUserId);
+
+    final followerRef = _db
+        .collection('users')
+        .doc(targetUserId)
+        .collection('followers')
+        .doc(currentUserId);
+
+    batch.delete(followingRef);
+    batch.delete(followerRef);
+
+    await batch.commit();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+      getFollowing(
+    String userId,
+  ) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('following')
+        .snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+      getFollowers(
+    String userId,
+  ) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('followers')
+        .snapshots();
+  }
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>>
+      getFollowStatus({
+    required String currentUserId,
+    required String targetUserId,
+  }) {
+    return _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('following')
+        .doc(targetUserId)
+        .snapshots();
+  }
+
+  // =========================================================
   // POSTS
+  // =========================================================
 
   Future<void> addPost({
     required String userId,
     required String userEmail,
     required String title,
     required String description,
+    String imageUrl = '',
   }) async {
     await _db.collection('posts').add({
       'userId': userId,
       'userEmail': userEmail,
       'title': title,
       'description': description,
-      'createdAt': FieldValue.serverTimestamp(),
+      'imageUrl': imageUrl,
+      'createdAt':
+          FieldValue.serverTimestamp(),
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getPosts() {
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+      getPosts() {
     return _db
         .collection('posts')
-        .orderBy('createdAt', descending: true)
+        .orderBy(
+          'createdAt',
+          descending: true,
+        )
         .snapshots();
   }
 
-  Future<void> deletePost(String postId) async {
-    await _db.collection('posts').doc(postId).delete();
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+      getPostsByUser(
+    String userId,
+  ) {
+    return _db
+        .collection('posts')
+        .where(
+          'userId',
+          isEqualTo: userId,
+        )
+        .snapshots();
   }
 
-  // COMMENTS 
+  Future<void> deletePost(
+    String postId,
+  ) async {
+    await _db
+        .collection('posts')
+        .doc(postId)
+        .delete();
+  }
+
+  // =========================================================
+  // COMMENTS
+  // =========================================================
 
   Future<void> addComment({
     required String postId,
@@ -75,11 +325,13 @@ class DatabaseService {
       'userId': userId,
       'userEmail': userEmail,
       'comment': comment,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt':
+          FieldValue.serverTimestamp(),
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getComments(
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+      getComments(
     String postId,
   ) {
     return _db
@@ -90,7 +342,9 @@ class DatabaseService {
         .snapshots();
   }
 
-  // LIKES 
+  // =========================================================
+  // LIKES
+  // =========================================================
 
   Future<void> likePost({
     required String postId,
@@ -103,7 +357,8 @@ class DatabaseService {
         .doc(userId)
         .set({
       'userId': userId,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt':
+          FieldValue.serverTimestamp(),
     });
   }
 
@@ -119,7 +374,8 @@ class DatabaseService {
         .delete();
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> getLikeStatus({
+  Stream<DocumentSnapshot<Map<String, dynamic>>>
+      getLikeStatus({
     required String postId,
     required String userId,
   }) {
@@ -131,7 +387,8 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getLikes(
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+      getLikes(
     String postId,
   ) {
     return _db
@@ -141,7 +398,9 @@ class DatabaseService {
         .snapshots();
   }
 
-  //  SAVED POSTS 
+  // =========================================================
+  // SAVED POSTS
+  // =========================================================
 
   Future<void> savePost({
     required String userId,
@@ -154,7 +413,8 @@ class DatabaseService {
         .doc(postId)
         .set({
       'postId': postId,
-      'savedAt': FieldValue.serverTimestamp(),
+      'savedAt':
+          FieldValue.serverTimestamp(),
     });
   }
 
@@ -170,7 +430,8 @@ class DatabaseService {
         .delete();
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> getSaveStatus({
+  Stream<DocumentSnapshot<Map<String, dynamic>>>
+      getSaveStatus({
     required String userId,
     required String postId,
   }) {
@@ -181,23 +442,4 @@ class DatabaseService {
         .doc(postId)
         .snapshots();
   }
-  
-  Future<void> ensureUserExists({
-  required String uid,
-  required String email,
-  String displayName = '',
-}) async {
-  final userRef = _db.collection('users').doc(uid);
-
-  final userDocument = await userRef.get();
-
-  if (!userDocument.exists) {
-    await userRef.set({
-      'uid': uid,
-      'email': email,
-      'displayName': displayName,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
-}
 }
