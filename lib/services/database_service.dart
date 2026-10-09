@@ -4,10 +4,7 @@ class DatabaseService {
   final FirebaseFirestore _db =
       FirebaseFirestore.instance;
 
-  // =========================================================
-  // USERS
-  // =========================================================
-
+ 
   Future<void> addUser({
     required String uid,
     required String email,

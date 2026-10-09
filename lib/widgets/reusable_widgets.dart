@@ -146,7 +146,6 @@ class ReminderCard extends StatelessWidget {
               value: isChecked,
               onChanged: onChanged,
             ),
-            Checkbox(value: isChecked, onChanged: onChanged),
           ],
         ),
       ),
@@ -185,40 +184,72 @@ class PlantCard extends StatelessWidget {
                       .primaryContainer,
                   child: Icon(
                     Icons.local_florist,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer,
                   ),
                 ),
-                const SizedBox(width: 12),
+
+                const SizedBox(
+                  width: 12,
+                ),
+
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    mainAxisSize:
+                        MainAxisSize.min,
                     children: [
                       Text(
                         plant.name,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium,
                       ),
+
                       Text(
                         plant.species,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall,
                       ),
+
                       if (!compact) ...[
-                        const SizedBox(height: 10),
+                        const SizedBox(
+                          height: 10,
+                        ),
+
                         if (plant.location != null)
-                          Text('Location: ${plant.location}'),
-                        const SizedBox(height: 4),
-                        Text(plant.wateringNote),
+                          Text(
+                            'Location: ${plant.location}',
+                          ),
+
+                        const SizedBox(
+                          height: 4,
+                        ),
+
+                        Text(
+                          plant.wateringNote,
+                        ),
                       ],
                     ],
                   ),
                 ),
+
                 if (onTap != null) ...[
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right),
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                  ),
                 ],
               ],
             ),
@@ -244,18 +275,40 @@ class PlantCareFact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        vertical: 12,
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 14),
+          Icon(
+            icon,
+            color: Theme.of(context)
+                .colorScheme
+                .primary,
+          ),
+
+          const SizedBox(
+            width: 14,
+          ),
+
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall,
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
                 Text(description),
               ],
             ),
