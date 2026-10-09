@@ -1,24 +1,32 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/database_service.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
-import '../services/database_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() =>
+      _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+class _LoginScreenState
+    extends State<LoginScreen> {
+  final TextEditingController emailController =
+      TextEditingController();
 
-  final AuthService _authService = AuthService();
-  final DatabaseService _databaseService = DatabaseService();
+  final TextEditingController passwordController =
+      TextEditingController();
+
+  final AuthService _authService =
+      AuthService();
+
+  final DatabaseService _databaseService =
+      DatabaseService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -27,19 +35,28 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
+
     super.dispose();
   }
 
   Future<void> _login() async {
-    final String email = emailController.text.trim();
-    final String password = passwordController.text;
+    final String email =
+        emailController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    final String password =
+        passwordController.text;
+
+    if (email.isEmpty ||
+        password.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
-          content: Text('Please enter your email and password.'),
+          content: Text(
+            'Please enter your email and password.',
+          ),
         ),
       );
+
       return;
     }
 
@@ -48,17 +65,24 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final user = await _authService.signInWithEmailAndPassword(
+      final user =
+          await _authService
+              .signInWithEmailAndPassword(
         email,
         password,
       );
 
       if (user == null) {
-        throw Exception('Unable to sign in.');
+        throw Exception(
+          'Unable to sign in.',
+        );
       }
-      await _databaseService.ensureUserExists(
+
+      await _databaseService
+          .ensureUserExists(
         uid: user.uid,
-        email: user.email ?? email,
+        email:
+            user.email ?? email,
       );
 
       if (!mounted) return;
@@ -66,15 +90,19 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
+          builder: (context) =>
+              const HomeScreen(),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
-          content: Text('Login failed: $e'),
+          content: Text(
+            'Login failed: $e',
+          ),
         ),
       );
     } finally {
@@ -90,27 +118,34 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding:
+              const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment:
+                MainAxisAlignment.center,
             children: [
               const Text(
                 'Welcome to PlantPal',
                 style: TextStyle(
                   fontSize: 30,
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                      FontWeight.bold,
                 ),
               ),
 
               const SizedBox(height: 40),
 
               TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                controller:
+                    emailController,
+                keyboardType:
+                    TextInputType.emailAddress,
+                decoration:
+                    const InputDecoration(
                   labelText: 'Email',
-                  border: OutlineInputBorder(),
+                  border:
+                      OutlineInputBorder(),
                 ),
               ),
 
@@ -138,7 +173,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
 
               Align(
-                alignment: Alignment.centerRight,
+                alignment:
+                    Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
                     Navigator.push(
@@ -149,7 +185,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     );
                   },
-                  child: const Text('Forgot Password?'),
+                  child: const Text(
+                    'Forgot Password?',
+                  ),
                 ),
               ),
 
@@ -158,16 +196,23 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
+                  onPressed:
+                      _isLoading
+                          ? null
+                          : _login,
                   child: _isLoading
                       ? const CircularProgressIndicator()
-                      : const Text('Login'),
+                      : const Text(
+                          'Login',
+                        ),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              const Text("Don't have an account?"),
+              const Text(
+                "Don't have an account?",
+              ),
 
               TextButton(
                 onPressed: () {
@@ -179,7 +224,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   );
                 },
-                child: const Text('Register'),
+                child:
+                    const Text('Register'),
               ),
             ],
           ),
