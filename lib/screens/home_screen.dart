@@ -27,13 +27,15 @@ class _HomeScreenState
 
   bool _showProfile = false;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    MyPlantsScreen(),
-    UploadScreen(),
-    PlantSearch(),
-    CommunityScreen(),
-  ];
+  List<Widget> get _screens => [
+        DashboardScreen(
+          onViewAllPlants: () => _selectBottomTab(1), // Switches to the 'My Plants' tab
+        ),
+        const MyPlantsScreen(),
+        const UploadScreen(),
+        const PlantSearch(),
+        const CommunityScreen(),
+      ];
 
   void _openProfile() {
     setState(() {
@@ -124,8 +126,10 @@ class _HomeScreenState
 
 class DashboardScreen
     extends StatefulWidget {
+      final VoidCallback onViewAllPlants;
   const DashboardScreen({
     super.key,
+    required this.onViewAllPlants,
   });
 
   @override

@@ -442,23 +442,4 @@ class DatabaseService {
         .doc(postId)
         .snapshots();
   }
-  
-  Future<void> ensureUserExists({
-    required String uid,
-    required String email,
-    String displayName = '',
-  }) async {
-    final userRef = _db.collection('users').doc(uid);
-
-    final userDocument = await userRef.get();
-
-    if (!userDocument.exists) {
-      await userRef.set({
-        'uid': uid,
-        'email': email,
-        'displayName': displayName,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
-  }
 }
