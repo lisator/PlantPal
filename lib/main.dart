@@ -1,14 +1,17 @@
+
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+
 import 'firebase_options.dart';
-import 'widgets/reusable_widgets.dart';
 import 'screens/home_screen.dart';
+import 'screens/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (defaultTargetPlatform != TargetPlatform.linux) {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.linux) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
@@ -24,7 +27,10 @@ class PlantPalApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'PlantPal',
-      home: const HomeScreen(),
+      // Firebase isn't set up on Linux desktop, so skip login and go straight home
+      home: !kIsWeb && defaultTargetPlatform == TargetPlatform.linux
+          ? const HomeScreen()
+          : const LoginScreen(),
     );
   }
 }

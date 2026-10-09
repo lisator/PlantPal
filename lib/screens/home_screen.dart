@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/reusable_widgets.dart';
 import 'my_plants_screen.dart';
 import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
+import 'plant_care_screen.dart';
 import 'community_screen.dart';
+import '../models/models.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,20 +18,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    MyPlantsScreen(),
-    UploadScreen(),
-    PlantSearch(),
-    CommunityScreen(),
+  late final List<Widget> _screens = [
+    DashboardScreen(onViewAllPlants: _showMyPlants),
+    const MyPlantsScreen(),
+    const UploadScreen(),
+    const PlantSearch(),
+    const CommunityScreen(),
   ];
+
+  void _showMyPlants() {
+    setState(() {
+      _selectedIndex = 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('PlantPal'),
-      ),
+      appBar: AppBar(title: const Text('PlantPal')),
+      drawer: const AppDrawer(),
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -38,46 +47,100 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Dashboard',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
           BottomNavigationBarItem(
             icon: Icon(Icons.local_florist),
             label: 'My Plants',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.upload),
-            label: 'Upload',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
           BottomNavigationBarItem(
             icon: Icon(Icons.search),
             label: 'Plant Search',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Community',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Community'),
         ],
       ),
     );
   }
 }
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key, required this.onViewAllPlants});
+
+  final VoidCallback onViewAllPlants;
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final List<Map<String, dynamic>> _reminders = [
+    {'message': 'Water your monstera today!', 'checked': false},
+    {'message': 'Check the basil soil moisture.', 'checked': true},
+  ];
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-        Text('Dashboard'),
-        SizedBox(height: 16),
-        Text('PlantPal home page'),
-        SizedBox(height: 16),
-        Text('Stats go here'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        //START OF REMINDERS CARD
+        Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Reminders',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                for (int i = 0; i < _reminders.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ReminderCard(
+                      message: _reminders[i]['message'],
+                      isChecked: _reminders[i]['checked'],
+                      onChanged: (value) {
+                        setState(() {
+                          _reminders[i]['checked'] = value ?? false;
+                        });
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Saved plants', style: Theme.of(context).textTheme.titleLarge),
+            TextButton(
+              onPressed: widget.onViewAllPlants,
+              child: const Text('View all'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 94,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: savedPlants.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => PlantCard(
+              plant: savedPlants[index],
+              compact: true,
+              onTap: () => openPlantCarePage(context, savedPlants[index]),
+            ),
+          ),
+        ),
       ],
+      //SAVED PLANTS SECTION
     );
   }
 }
