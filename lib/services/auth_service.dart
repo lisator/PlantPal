@@ -59,6 +59,51 @@ class AuthService {
     }
   }
 
+  Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required Function(String verificationId) onCodeSent,
+    required Function(FirebaseAuthException e) onVerificationFailed,
+    required Function(PhoneAuthCredential credential) onAutoVerificationComplete,
+  }) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Auto-resolution on Android devices (instant verification)
+        onAutoVerificationComplete(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        onVerificationFailed(e);
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        // Save this verificationId—you need it along with the SMS code to sign in!
+        onCodeSent(verificationId);
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        // Auto-resolution timeout
+      },
+    );
+  }
+
+  Future<User?> verifySMSCode({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    try {
+      // Create a credential using the verification ID and the code entered by the user
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      // Sign the user in with the credential
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      return userCredential.user;
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'Failed to verify SMS code.');
+    }
+  }
+
+
   Future<void> signOut() async {
     await _auth.signOut();
   }
