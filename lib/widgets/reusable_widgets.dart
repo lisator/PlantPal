@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../models/models.dart';
 import '../screens/login_screen.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -145,6 +147,172 @@ class ReminderCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class PlantCard extends StatelessWidget {
+  const PlantCard({
+    super.key,
+    required this.plant,
+    this.compact = false,
+    this.onTap,
+  });
+
+  final Plant plant;
+  final bool compact;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: compact ? 248 : null,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer,
+                  child: Icon(
+                    Icons.local_florist,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer,
+                  ),
+                ),
+
+                const SizedBox(
+                  width: 12,
+                ),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    mainAxisSize:
+                        MainAxisSize.min,
+                    children: [
+                      Text(
+                        plant.name,
+                        maxLines: 1,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium,
+                      ),
+
+                      Text(
+                        plant.species,
+                        maxLines: 1,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall,
+                      ),
+
+                      if (!compact) ...[
+                        const SizedBox(
+                          height: 10,
+                        ),
+
+                        if (plant.location != null)
+                          Text(
+                            'Location: ${plant.location}',
+                          ),
+
+                        const SizedBox(
+                          height: 4,
+                        ),
+
+                        Text(
+                          plant.wateringNote,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                if (onTap != null) ...[
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PlantCareFact extends StatelessWidget {
+  const PlantCareFact({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 12,
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: Theme.of(context)
+                .colorScheme
+                .primary,
+          ),
+
+          const SizedBox(
+            width: 14,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall,
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
+                Text(description),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
