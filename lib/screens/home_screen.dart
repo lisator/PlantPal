@@ -8,8 +8,6 @@ import 'my_plants_screen.dart';
 import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
 import 'plant_care_screen.dart';
-import 'community_screen.dart';
-import '../models/models.dart';
 import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -85,13 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _selectBottomTab,
 
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.home,
-            ),
-            label: 'Dashboard',
-          ),
-
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Dashboard',
