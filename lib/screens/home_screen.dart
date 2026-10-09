@@ -126,8 +126,6 @@ class DashboardScreen
     required this.onViewAllPlants,
   });
 
-  final VoidCallback onViewAllPlants;
-
   @override
   State<DashboardScreen> createState() =>
       _DashboardScreenState();
