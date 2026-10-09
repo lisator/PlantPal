@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
-import '../screens/profile_screen.dart';
 import '../screens/login_screen.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
+  final VoidCallback? onProfileTap;
+
+  const AppDrawer({
+    super.key,
+    this.onProfileTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,44 +23,77 @@ class AppDrawer extends StatelessWidget {
             ),
             child: Text(
               'PlantPal',
-              style: TextStyle(color: Colors.white, fontSize: 24),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+              ),
             ),
           ),
+
           ListTile(
-            leading: const Icon(Icons.account_circle),
+            leading: const Icon(
+              Icons.account_circle,
+            ),
             title: const Text('Profile'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
+
+              if (onProfileTap != null) {
+                onProfileTap!();
+              }
             },
           ),
+
           ListTile(
-            leading: const Icon(Icons.message),
+            leading: const Icon(
+              Icons.message,
+            ),
             title: const Text('Messages'),
             onTap: () {
               Navigator.pop(context);
-              // Messages screen will be added later.
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Messages will be added later.',
+                  ),
+                ),
+              );
             },
           ),
+
           ListTile(
-            leading: const Icon(Icons.settings),
+            leading: const Icon(
+              Icons.settings,
+            ),
             title: const Text('Settings'),
             onTap: () {
               Navigator.pop(context);
-              // Settings screen will be added later.
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Settings will be added later.',
+                  ),
+                ),
+              );
             },
           ),
+
           const Divider(),
+
           ListTile(
-            leading: const Icon(Icons.logout),
+            leading: const Icon(
+              Icons.logout,
+            ),
             title: const Text('Log Out'),
             onTap: () {
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const LoginScreen(),
+                ),
                 (route) => false,
               );
             },
@@ -87,12 +124,27 @@ class ReminderCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            const Icon(Icons.local_florist),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 14)),
+            const Icon(
+              Icons.local_florist,
             ),
-            Checkbox(value: isChecked, onChanged: onChanged),
+
+            const SizedBox(
+              width: 12,
+            ),
+
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 14,
+                ),
+              ),
+            ),
+
+            Checkbox(
+              value: isChecked,
+              onChanged: onChanged,
+            ),
           ],
         ),
       ),
@@ -131,40 +183,72 @@ class PlantCard extends StatelessWidget {
                       .primaryContainer,
                   child: Icon(
                     Icons.local_florist,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer,
                   ),
                 ),
-                const SizedBox(width: 12),
+
+                const SizedBox(
+                  width: 12,
+                ),
+
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    mainAxisSize:
+                        MainAxisSize.min,
                     children: [
                       Text(
                         plant.name,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium,
                       ),
+
                       Text(
                         plant.species,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall,
                       ),
+
                       if (!compact) ...[
-                        const SizedBox(height: 10),
+                        const SizedBox(
+                          height: 10,
+                        ),
+
                         if (plant.location != null)
-                          Text('Location: ${plant.location}'),
-                        const SizedBox(height: 4),
-                        Text(plant.wateringNote),
+                          Text(
+                            'Location: ${plant.location}',
+                          ),
+
+                        const SizedBox(
+                          height: 4,
+                        ),
+
+                        Text(
+                          plant.wateringNote,
+                        ),
                       ],
                     ],
                   ),
                 ),
+
                 if (onTap != null) ...[
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right),
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                  ),
                 ],
               ],
             ),
@@ -190,18 +274,40 @@ class PlantCareFact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        vertical: 12,
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 14),
+          Icon(
+            icon,
+            color: Theme.of(context)
+                .colorScheme
+                .primary,
+          ),
+
+          const SizedBox(
+            width: 14,
+          ),
+
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 4),
+                Text(
+                  title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall,
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
                 Text(description),
               ],
             ),

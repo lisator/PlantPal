@@ -4,36 +4,37 @@ import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
 import 'add_post_screen.dart';
+import 'find_users_screen.dart';
+import 'user_profile_screen.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  State<CommunityScreen> createState() =>
-      _CommunityScreenState();
+  State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState
-    extends State<CommunityScreen> {
-  final DatabaseService _databaseService =
-      DatabaseService();
+class _CommunityScreenState extends State<CommunityScreen> {
+  final DatabaseService _databaseService = DatabaseService();
 
-  Future<void> _addComment(
-    String postId,
-  ) async {
-    final TextEditingController controller =
-        TextEditingController();
+  Future<void> _addComment(String postId) async {
+    final commentController = TextEditingController();
 
-    final String? comment =
-        await showDialog<String>(
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return;
+    }
+
+    final bool? shouldPost = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Add Comment'),
           content: TextField(
-            controller: controller,
-            maxLines: 3,
+            controller: commentController,
             maxLength: 500,
+            maxLines: 3,
             decoration: const InputDecoration(
               hintText: 'Write a comment...',
               border: OutlineInputBorder(),
@@ -42,68 +43,44 @@ class _CommunityScreenState
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(context, false);
               },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                final text =
-                    controller.text.trim();
-
-                if (text.isNotEmpty) {
-                  Navigator.pop(
-                    context,
-                    text,
-                  );
-                }
+                Navigator.pop(context, true);
               },
-              child: const Text('Comment'),
+              child: const Text('Post'),
             ),
           ],
         );
       },
     );
 
-    controller.dispose();
-
-    if (comment == null ||
-        comment.isEmpty) {
+    if (shouldPost != true) {
+      commentController.dispose();
       return;
     }
 
-    final User? user =
-        FirebaseAuth.instance.currentUser;
+    final comment = commentController.text.trim();
 
-    if (user == null) {
+    commentController.dispose();
+
+    if (comment.isEmpty) {
       return;
     }
 
-    try {
-      await _databaseService.addComment(
-        postId: postId,
-        userId: user.uid,
-        userEmail: user.email ?? '',
-        comment: comment,
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to add comment: $e',
-          ),
-        ),
-      );
-    }
+    await _databaseService.addComment(
+      postId: postId,
+      userId: user.uid,
+      userEmail: user.email ?? '',
+      comment: comment,
+    );
   }
 
-  Future<void> _deletePost(
-    String postId,
-  ) async {
-    final bool? shouldDelete =
-        await showDialog<bool>(
+  Future<void> _deletePost(String postId) async {
+    final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -114,19 +91,13 @@ class _CommunityScreenState
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(
-                  context,
-                  false,
-                );
+                Navigator.pop(context, false);
               },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(
-                  context,
-                  true,
-                );
+                Navigator.pop(context, true);
               },
               child: const Text('Delete'),
             ),
@@ -135,567 +106,592 @@ class _CommunityScreenState
       },
     );
 
-    if (shouldDelete != true) {
-      return;
-    }
-
-    try {
-      await _databaseService.deletePost(
-        postId,
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to delete post: $e',
-          ),
-        ),
-      );
+    if (shouldDelete == true) {
+      await _databaseService.deletePost(postId);
     }
   }
 
   Future<void> _toggleLike({
     required String postId,
-    required User user,
+    required String userId,
     required bool isLiked,
   }) async {
-    try {
-      if (isLiked) {
-        await _databaseService.unlikePost(
-          postId: postId,
-          userId: user.uid,
-        );
-      } else {
-        await _databaseService.likePost(
-          postId: postId,
-          userId: user.uid,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to update like: $e',
-          ),
-        ),
+    if (isLiked) {
+      await _databaseService.unlikePost(
+        postId: postId,
+        userId: userId,
+      );
+    } else {
+      await _databaseService.likePost(
+        postId: postId,
+        userId: userId,
       );
     }
   }
 
   Future<void> _toggleSave({
     required String postId,
-    required User user,
+    required String userId,
     required bool isSaved,
   }) async {
-    try {
-      if (isSaved) {
-        await _databaseService.unsavePost(
-          userId: user.uid,
-          postId: postId,
-        );
-      } else {
-        await _databaseService.savePost(
-          userId: user.uid,
-          postId: postId,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to update saved post: $e',
-          ),
-        ),
+    if (isSaved) {
+      await _databaseService.unsavePost(
+        userId: userId,
+        postId: postId,
+      );
+    } else {
+      await _databaseService.savePost(
+        userId: userId,
+        postId: postId,
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final User? currentUser =
-        FirebaseAuth.instance.currentUser;
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Please log in.'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding:
-                const EdgeInsets.all(16),
-            child: Align(
-              alignment:
-                  Alignment.centerRight,
-              child:
-                  OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          const AddPostScreen(),
-                    ),
-                  );
-                },
-                icon:
-                    const Icon(Icons.add),
-                label:
-                    const Text('Add Post'),
-              ),
-            ),
-          ),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _databaseService.getFollowing(currentUser.uid),
+        builder: (context, followingSnapshot) {
+          final Set<String> followingIds =
+              followingSnapshot.data?.docs.map((doc) => doc.id).toSet() ?? {};
 
-          Expanded(
-            child: StreamBuilder<
-                QuerySnapshot<
-                    Map<String, dynamic>>>(
-              stream:
-                  _databaseService.getPosts(),
-              builder:
-                  (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Unable to load posts.\n${snapshot.error}',
-                      textAlign:
-                          TextAlign.center,
-                    ),
-                  );
-                }
+          final Set<String> allowedUserIds = {
+            currentUser.uid,
+            ...followingIds,
+          };
 
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                    child:
-                        CircularProgressIndicator(),
-                  );
-                }
-
-                final posts =
-                    snapshot.data?.docs ?? [];
-
-                if (posts.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment
-                              .center,
-                      children: [
-                        Icon(
-                          Icons.local_florist,
-                          size: 70,
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  12,
+                  16,
+                  4,
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'People You May Know',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                        SizedBox(
-                          height: 15,
-                        ),
-                        Text(
-                          'Your feed is empty',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight:
-                                FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(
-                          height: 8,
-                        ),
-                        Text(
-                          'Create a post to get started!',
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding:
-                      const EdgeInsets.all(
-                    16,
-                  ),
-                  itemCount:
-                      posts.length,
-                  itemBuilder:
-                      (context, index) {
-                    final document =
-                        posts[index];
-
-                    final data =
-                        document.data();
-
-                    final String userId =
-                        data['userId'] ??
-                            '';
-
-                    final String email =
-                        data['userEmail'] ??
-                            'PlantPal User';
-
-                    final String title =
-                        data['title'] ??
-                            '';
-
-                    final String description =
-                        data['description'] ??
-                            '';
-
-                    final bool isOwner =
-                        currentUser?.uid ==
-                            userId;
-
-                    return Card(
-                      margin:
-                          const EdgeInsets
-                              .only(
-                        bottom: 20,
                       ),
-                      child: Padding(
-                        padding:
-                            const EdgeInsets
-                                .all(16),
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                          children: [
-                            Row(
-                              children: [
-                                const CircleAvatar(
-                                  child: Icon(
-                                    Icons
-                                        .person,
-                                  ),
-                                ),
-                                const SizedBox(
-                                  width: 10,
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    email,
-                                    style:
-                                        const TextStyle(
-                                      fontWeight:
-                                          FontWeight
-                                              .bold,
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const FindUsersScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text('See All'),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(
+                height: 145,
+                child: StreamBuilder<
+                    QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _databaseService.getUsers(),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    final recommended = userSnapshot.data!.docs
+                        .where(
+                          (doc) =>
+                              doc.id != currentUser.uid &&
+                              !followingIds.contains(doc.id),
+                        )
+                        .take(8)
+                        .toList();
+
+                    if (recommended.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'You are following everyone!',
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                      ),
+                      itemCount: recommended.length,
+                      itemBuilder: (context, index) {
+                        final userDoc = recommended[index];
+                        final data = userDoc.data();
+
+                        final String username =
+                            data['username'] ?? '';
+
+                        final String name =
+                            data['displayName'] ??
+                                'PlantPal User';
+
+                        return SizedBox(
+                          width: 135,
+                          child: Card(
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        UserProfileScreen(
+                                      userId: userDoc.id,
                                     ),
                                   ),
-                                ),
-                                if (isOwner)
-                                  IconButton(
-                                    tooltip:
-                                        'Delete Post',
-                                    onPressed:
-                                        () {
-                                      _deletePost(
-                                        document
-                                            .id,
-                                      );
-                                    },
-                                    icon:
-                                        const Icon(
-                                      Icons
-                                          .delete_outline,
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Column(
+                                  children: [
+                                    const CircleAvatar(
+                                      child: Icon(
+                                        Icons.person,
+                                      ),
                                     ),
-                                  ),
-                              ],
-                            ),
-
-                            const SizedBox(
-                              height: 15,
-                            ),
-
-                            Text(
-                              title,
-                              style:
-                                  const TextStyle(
-                                fontSize: 20,
-                                fontWeight:
-                                    FontWeight
-                                        .bold,
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      username.isNotEmpty
+                                          ? '@$username'
+                                          : name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const Spacer(),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: () async {
+                                          await _databaseService
+                                              .followUser(
+                                            currentUserId:
+                                                currentUser.uid,
+                                            targetUserId:
+                                                userDoc.id,
+                                          );
+                                        },
+                                        child: const Text(
+                                          'Follow',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
 
-                            const SizedBox(
-                              height: 8,
-                            ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Your Feed',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const AddPostScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Post'),
+                    ),
+                  ],
+                ),
+              ),
 
-                            Text(
-                              description,
-                            ),
+              Expanded(
+                child: StreamBuilder<
+                    QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _databaseService.getPosts(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
 
-                            const SizedBox(
-                              height: 12,
-                            ),
+                    final posts = snapshot.data!.docs.where(
+                      (post) {
+                        final postUserId =
+                            post.data()['userId'] ?? '';
 
-                            const Divider(),
+                        return allowedUserIds.contains(
+                          postUserId,
+                        );
+                      },
+                    ).toList();
 
-                            Row(
+                    if (posts.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'Your feed is empty. Create a post or follow someone to see their posts.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        final post = posts[index];
+                        final data = post.data();
+
+                        final String postId = post.id;
+                        final String userId =
+                            data['userId'] ?? '';
+                        final String userEmail =
+                            data['userEmail'] ?? '';
+                        final String title =
+                            data['title'] ?? '';
+                        final String description =
+                            data['description'] ?? '';
+                        final String imageUrl =
+                            data['imageUrl'] ?? '';
+
+                        final bool isOwner =
+                            userId == currentUser.uid;
+
+                        return Card(
+                          margin: const EdgeInsets.only(
+                            bottom: 16,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
-                                StreamBuilder<
-                                    DocumentSnapshot<
-                                        Map<String,
-                                            dynamic>>>(
-                                  stream:
-                                      currentUser ==
-                                              null
-                                          ? null
-                                          : _databaseService
-                                              .getLikeStatus(
-                                              postId:
-                                                  document.id,
+                                Row(
+                                  children: [
+                                    const CircleAvatar(
+                                      child: Icon(
+                                        Icons.person,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        userEmail,
+                                        style: const TextStyle(
+                                          fontWeight:
+                                              FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isOwner)
+                                      IconButton(
+                                        onPressed: () {
+                                          _deletePost(postId);
+                                        },
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 14),
+
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 21,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                Text(description),
+
+                                if (imageUrl.isNotEmpty) ...[
+                                  const SizedBox(height: 14),
+
+                                  Center(
+                                    child: ClipRRect(
+                                      borderRadius:
+                                          BorderRadius.circular(
+                                        12,
+                                      ),
+                                      child: Container(
+                                        width: double.infinity,
+                                        height: 320,
+                                        color: Colors.black12,
+                                        child: Image.network(
+                                          imageUrl,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) {
+                                            return const Center(
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .center,
+                                                children: [
+                                                  Icon(
+                                                    Icons
+                                                        .broken_image_outlined,
+                                                    size: 42,
+                                                  ),
+                                                  SizedBox(
+                                                    height: 8,
+                                                  ),
+                                                  Text(
+                                                    'Unable to load image',
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+
+                                const SizedBox(height: 8),
+                                const Divider(),
+
+                                Row(
+                                  children: [
+                                    StreamBuilder<
+                                        DocumentSnapshot<
+                                            Map<String, dynamic>>>(
+                                      stream: _databaseService
+                                          .getLikeStatus(
+                                        postId: postId,
+                                        userId:
+                                            currentUser.uid,
+                                      ),
+                                      builder:
+                                          (context, likeSnapshot) {
+                                        final bool isLiked =
+                                            likeSnapshot
+                                                    .data
+                                                    ?.exists ??
+                                                false;
+
+                                        return IconButton(
+                                          onPressed: () {
+                                            _toggleLike(
+                                              postId: postId,
                                               userId:
                                                   currentUser.uid,
-                                            ),
-                                  builder:
-                                      (context,
-                                          likeSnapshot) {
-                                    final bool
-                                        isLiked =
-                                        likeSnapshot
-                                                .data
-                                                ?.exists ??
-                                            false;
+                                              isLiked: isLiked,
+                                            );
+                                          },
+                                          icon: Icon(
+                                            isLiked
+                                                ? Icons.favorite
+                                                : Icons
+                                                    .favorite_border,
+                                          ),
+                                        );
+                                      },
+                                    ),
 
-                                    return IconButton(
-                                      tooltip:
-                                          isLiked
-                                              ? 'Unlike'
-                                              : 'Like',
-                                      icon:
-                                          Icon(
-                                        isLiked
-                                            ? Icons
-                                                .favorite
-                                            : Icons
-                                                .favorite_border,
+                                    StreamBuilder<
+                                        QuerySnapshot<
+                                            Map<String, dynamic>>>(
+                                      stream:
+                                          _databaseService.getLikes(
+                                        postId,
                                       ),
-                                      onPressed:
-                                          currentUser ==
-                                                  null
-                                              ? null
-                                              : () {
-                                                  _toggleLike(
-                                                    postId:
-                                                        document.id,
-                                                    user:
-                                                        currentUser,
-                                                    isLiked:
-                                                        isLiked,
-                                                  );
-                                                },
-                                    );
-                                  },
+                                      builder:
+                                          (context, likesSnapshot) {
+                                        return Text(
+                                          '${likesSnapshot.data?.docs.length ?? 0}',
+                                        );
+                                      },
+                                    ),
+
+                                    const SizedBox(width: 12),
+
+                                    IconButton(
+                                      onPressed: () {
+                                        _addComment(postId);
+                                      },
+                                      icon: const Icon(
+                                        Icons.comment_outlined,
+                                      ),
+                                    ),
+
+                                    const Spacer(),
+
+                                    StreamBuilder<
+                                        DocumentSnapshot<
+                                            Map<String, dynamic>>>(
+                                      stream: _databaseService
+                                          .getSaveStatus(
+                                        userId:
+                                            currentUser.uid,
+                                        postId: postId,
+                                      ),
+                                      builder:
+                                          (context, saveSnapshot) {
+                                        final bool isSaved =
+                                            saveSnapshot
+                                                    .data
+                                                    ?.exists ??
+                                                false;
+
+                                        return IconButton(
+                                          onPressed: () {
+                                            _toggleSave(
+                                              postId: postId,
+                                              userId:
+                                                  currentUser.uid,
+                                              isSaved: isSaved,
+                                            );
+                                          },
+                                          icon: Icon(
+                                            isSaved
+                                                ? Icons.bookmark
+                                                : Icons
+                                                    .bookmark_border,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
 
                                 StreamBuilder<
                                     QuerySnapshot<
-                                        Map<String,
-                                            dynamic>>>(
-                                  stream:
-                                      _databaseService
-                                          .getLikes(
-                                    document.id,
+                                        Map<String, dynamic>>>(
+                                  stream: _databaseService
+                                      .getComments(
+                                    postId,
                                   ),
                                   builder:
-                                      (context,
-                                          likesSnapshot) {
-                                    final int
-                                        likeCount =
-                                        likesSnapshot
+                                      (context, commentSnapshot) {
+                                    final comments =
+                                        commentSnapshot
                                                 .data
-                                                ?.docs
-                                                .length ??
-                                            0;
+                                                ?.docs ??
+                                            [];
 
-                                    return Text(
-                                      '$likeCount',
-                                    );
-                                  },
-                                ),
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: comments.map(
+                                        (commentDoc) {
+                                          final commentData =
+                                              commentDoc.data();
 
-                                const SizedBox(
-                                  width: 20,
-                                ),
+                                          final String email =
+                                              commentData[
+                                                      'userEmail'] ??
+                                                  '';
 
-                                IconButton(
-                                  tooltip:
-                                      'Comment',
-                                  icon:
-                                      const Icon(
-                                    Icons
-                                        .comment_outlined,
-                                  ),
-                                  onPressed:
-                                      () {
-                                    _addComment(
-                                      document
-                                          .id,
-                                    );
-                                  },
-                                ),
+                                          final String comment =
+                                              commentData[
+                                                      'comment'] ??
+                                                  '';
 
-                                const Spacer(),
-
-                                StreamBuilder<
-                                    DocumentSnapshot<
-                                        Map<String,
-                                            dynamic>>>(
-                                  stream:
-                                      currentUser ==
-                                              null
-                                          ? null
-                                          : _databaseService
-                                              .getSaveStatus(
-                                              userId:
-                                                  currentUser.uid,
-                                              postId:
-                                                  document.id,
+                                          return Padding(
+                                            padding:
+                                                const EdgeInsets.only(
+                                              top: 5,
                                             ),
-                                  builder:
-                                      (context,
-                                          saveSnapshot) {
-                                    final bool
-                                        isSaved =
-                                        saveSnapshot
-                                                .data
-                                                ?.exists ??
-                                            false;
-
-                                    return IconButton(
-                                      tooltip:
-                                          isSaved
-                                              ? 'Unsave'
-                                              : 'Save',
-                                      icon:
-                                          Icon(
-                                        isSaved
-                                            ? Icons
-                                                .bookmark
-                                            : Icons
-                                                .bookmark_border,
-                                      ),
-                                      onPressed:
-                                          currentUser ==
-                                                  null
-                                              ? null
-                                              : () {
-                                                  _toggleSave(
-                                                    postId:
-                                                        document.id,
-                                                    user:
-                                                        currentUser,
-                                                    isSaved:
-                                                        isSaved,
-                                                  );
-                                                },
+                                            child: RichText(
+                                              text: TextSpan(
+                                                style:
+                                                    DefaultTextStyle
+                                                        .of(context)
+                                                        .style,
+                                                children: [
+                                                  TextSpan(
+                                                    text:
+                                                        '$email: ',
+                                                    style:
+                                                        const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight
+                                                              .bold,
+                                                    ),
+                                                  ),
+                                                  TextSpan(
+                                                    text:
+                                                        comment,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ).toList(),
                                     );
                                   },
                                 ),
                               ],
                             ),
-
-                            StreamBuilder<
-                                QuerySnapshot<
-                                    Map<String,
-                                        dynamic>>>(
-                              stream:
-                                  _databaseService
-                                      .getComments(
-                                document.id,
-                              ),
-                              builder:
-                                  (context,
-                                      commentSnapshot) {
-                                if (!commentSnapshot
-                                        .hasData ||
-                                    commentSnapshot
-                                        .data!
-                                        .docs
-                                        .isEmpty) {
-                                  return const SizedBox();
-                                }
-
-                                final comments =
-                                    commentSnapshot
-                                        .data!
-                                        .docs;
-
-                                return Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
-                                  children:
-                                      comments.map(
-                                    (commentDoc) {
-                                      final comment =
-                                          commentDoc
-                                              .data();
-
-                                      final String
-                                          commentEmail =
-                                          comment[
-                                                  'userEmail'] ??
-                                              'User';
-
-                                      final String
-                                          commentText =
-                                          comment[
-                                                  'comment'] ??
-                                              '';
-
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets
-                                                .only(
-                                          top: 8,
-                                        ),
-                                        child:
-                                            RichText(
-                                          text:
-                                              TextSpan(
-                                            style:
-                                                DefaultTextStyle.of(
-                                              context,
-                                            ).style,
-                                            children: [
-                                              TextSpan(
-                                                text:
-                                                    '$commentEmail: ',
-                                                style:
-                                                    const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.bold,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text:
-                                                    commentText,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ).toList(),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
