@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/my_plant.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db =
@@ -438,5 +439,66 @@ class DatabaseService {
         .collection('savedPosts')
         .doc(postId)
         .snapshots();
+  }
+
+  // =========================================================
+  // MY PLANTS
+  // =========================================================
+
+  // Doc id is the Perenual species id, so a species can't be added twice.
+  Future<void> addMyPlant({
+    required String userId,
+    required MyPlant plant,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc('${plant.perenualId}')
+        .set(plant.toFirestore());
+  }
+
+  Future<void> removeMyPlant({
+    required String userId,
+    required int perenualId,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc('$perenualId')
+        .delete();
+  }
+
+  Stream<List<MyPlant>> getMyPlants(
+    String userId,
+  ) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .orderBy(
+          'addedAt',
+          descending: true,
+        )
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => MyPlant.fromFirestore(doc.data()))
+              .toList(),
+        );
+  }
+
+  Stream<bool> isInMyPlants({
+    required String userId,
+    required int perenualId,
+  }) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc('$perenualId')
+        .snapshots()
+        .map((doc) => doc.exists);
   }
 }
