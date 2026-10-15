@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,10 +21,9 @@ class PerenualException implements Exception {
 
 /// Plant search and care details from the Perenual API.
 ///
-/// The API key is supplied at build time so it never gets committed:
+/// The API key is read from Firestore (config/perenual, field "apiKey") the
+/// first time it's needed. For local testing it can be overridden with
 ///   flutter run --dart-define=PERENUAL_API_KEY=your_key
-/// or put {"PERENUAL_API_KEY": "your_key"} in PlantPal/.env.json (gitignored) and run
-///   flutter run --dart-define-from-file=.env.json
 ///
 /// The free tier allows 100 requests/day, so every response is cached on the
 /// device for [_cacheDuration]. Restarting the app does not re-fetch anything.
@@ -31,7 +32,7 @@ class PerenualService {
 
   static final PerenualService instance = PerenualService._();
 
-  static const String _apiKey = String.fromEnvironment('PERENUAL_API_KEY');
+  static const String _keyOverride = String.fromEnvironment('PERENUAL_API_KEY');
   static const String _baseUrl = 'https://perenual.com/api/v2';
   static const Duration _timeout = Duration(seconds: 15);
   static const Duration _cacheDuration = Duration(days: 7);
@@ -39,8 +40,33 @@ class PerenualService {
 
   final Map<String, PlantSearchPage> _searchCache = {};
   final Map<int, PlantDetails> _detailsCache = {};
+  String? _apiKey;
 
-  bool get hasApiKey => _apiKey.isNotEmpty;
+  Future<String> _getApiKey() async {
+    if (_keyOverride.isNotEmpty) return _keyOverride;
+    if (_apiKey != null) return _apiKey!;
+
+    if (Firebase.apps.isEmpty) {
+      throw const PerenualException(
+        'Plant search needs Firebase, which is not set up on this platform.',
+      );
+    }
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('config')
+          .doc('perenual')
+          .get();
+      final key = doc.data()?['apiKey'];
+      if (key is String && key.isNotEmpty) {
+        return _apiKey = key;
+      }
+    } catch (e) {
+      debugPrint('Could not load Perenual API key: $e');
+    }
+    throw const PerenualException(
+      'Plant search is not configured. Could not load the Perenual API key.',
+    );
+  }
 
   Future<PlantSearchPage> searchPlants(String query, {int page = 1}) async {
     final normalized = query.trim().toLowerCase();
@@ -50,7 +76,6 @@ class PerenualService {
 
     final json = await _getCached(Uri.parse('$_baseUrl/species-list').replace(
       queryParameters: {
-        'key': _apiKey,
         'q': normalized,
         'page': '$page',
       },
@@ -65,9 +90,7 @@ class PerenualService {
     final cached = _detailsCache[id];
     if (cached != null) return cached;
 
-    final json = await _getCached(Uri.parse('$_baseUrl/species/details/$id').replace(
-      queryParameters: {'key': _apiKey},
-    ));
+    final json = await _getCached(Uri.parse('$_baseUrl/species/details/$id'));
 
     var details = PlantDetails.fromJson(json);
 
@@ -76,9 +99,7 @@ class PerenualService {
     if (guideUrl != null) {
       try {
         final guideUri = Uri.parse(guideUrl.replaceFirst('http://', 'https://'));
-        final guideJson = await _getCached(guideUri.replace(
-          queryParameters: {...guideUri.queryParameters, 'key': _apiKey},
-        ));
+        final guideJson = await _getCached(guideUri);
         details = details.copyWithCareGuide(parseCareGuide(guideJson));
       } catch (_) {}
     }
@@ -88,10 +109,9 @@ class PerenualService {
   }
 
   /// Returns a saved response for [uri] if one is fresh, otherwise fetches it
-  /// and saves it. The API key is left out of the cache key.
+  /// and saves it.
   Future<Map<String, dynamic>> _getCached(Uri uri) async {
-    final params = Map.of(uri.queryParameters)..remove('key');
-    final cacheKey = _cachePrefix + uri.replace(queryParameters: params).toString();
+    final cacheKey = _cachePrefix + uri.toString();
 
     SharedPreferences? prefs;
     try {
@@ -121,17 +141,14 @@ class PerenualService {
   }
 
   Future<Map<String, dynamic>> _get(Uri uri) async {
-    debugPrint('Perenual request: ${uri.path}?${uri.query.replaceAll(RegExp(r'key=[^&]*&?'), '')}');
-    if (!hasApiKey) {
-      throw const PerenualException(
-        'Plant search is not configured. Add a Perenual API key '
-        '(see PerenualService for setup).',
-      );
-    }
+    debugPrint('Perenual request: ${uri.path}?${uri.query}');
+    final key = await _getApiKey();
 
     final http.Response response;
     try {
-      response = await http.get(uri).timeout(_timeout);
+      response = await http
+          .get(uri.replace(queryParameters: {...uri.queryParameters, 'key': key}))
+          .timeout(_timeout);
     } on TimeoutException {
       throw const PerenualException(
         'The plant database took too long to respond. Please try again.',

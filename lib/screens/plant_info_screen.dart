@@ -180,15 +180,6 @@ class _PlantSearchState extends State<PlantSearch> {
   }
 
   Widget _buildBody(BuildContext context) {
-    if (!_api.hasApiKey) {
-      return const _SearchMessage(
-        icon: Icons.key_off_outlined,
-        title: 'Plant search is not configured',
-        message: 'Run the app with a Perenual API key:\n'
-            'flutter run --dart-define=PERENUAL_API_KEY=your_key',
-      );
-    }
-
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
