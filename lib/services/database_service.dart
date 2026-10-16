@@ -442,4 +442,62 @@ class DatabaseService {
         .doc(postId)
         .snapshots();
   }
+
+// =========================================================
+  // SAVED PLANTS (MY PLANTS)
+  // =========================================================
+
+  Future<void> addPlant( {
+    required String userID,
+    required String name,
+    required String species,
+    required String description,
+    String? imageUrl,
+  }) async {
+    await _db.collection('users')
+    .doc(userID)
+    .collection('plants')
+    .add({
+      'userID': userID,
+      'name': name,
+      'species': species,
+      'description': description,
+      'imageUrl': imageUrl ?? '',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> getUserPlants(String userID) {
+    return _db
+        .collection('users')
+        .doc(userID)
+        .collection('plants')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  Future<void> updatePlant({
+    required String userID,
+    required String plantID,
+    required Map<String, dynamic> updatedData,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userID)
+        .collection('plants')
+        .doc(plantID)
+        .update(updatedData);
+      }
+
+    Future<void> deletePlant({
+      required String userID,
+      required String plantID,
+    }) async {
+      await _db
+          .collection('users')
+          .doc(userID)
+          .collection('plants')
+          .doc(plantID)
+          .delete();
+    }
 }

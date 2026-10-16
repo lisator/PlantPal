@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final DatabaseService _dbService = FirebaseFirestore.instance;
 
   Future<String> uploadPostImage({
     required String userId,
@@ -44,6 +45,28 @@ class StorageService {
     } catch (e) {
       print('Error deleting file: $e');
     }
+  }
+
+  Future<void> savePlantWithImage({
+    required String userID,
+    required String plantName,
+    required String species,
+    required String description,
+    required Uint8List imageBytes,
+    required String fileName,
+  }) async {
+    String imageURL = await _storageService.uploadPostImage(
+      userId: userID,
+      imageBytes: imageBytes,
+      fileName: fileName,
+    );
+    await _dbService.savePlant(
+      userID: userID,
+      plantName: plantName,
+      species: species,
+      description: description,
+      imageURL: imageURL,
+    );
   }
 
   Future<FullMetadata?> getFileMetadata(String fileUrl) async ({
