@@ -96,6 +96,7 @@ class PlantDetails {
     this.poisonousToPets,
     this.careGuideUrl,
     this.careGuide = const {},
+    this.wikipediaUrl,
     this.isLimited = false,
   });
 
@@ -146,10 +147,18 @@ class PlantDetails {
   /// Care guide sections keyed by type (e.g. "watering", "sunlight", "pruning").
   final Map<String, String> careGuide;
 
+  /// Set when the description or image came from Wikipedia, for attribution.
+  final String? wikipediaUrl;
+
   /// True when only basic info is available (see [PlantDetails.basic]).
   final bool isLimited;
 
-  PlantDetails copyWithCareGuide(Map<String, String> guide) {
+  PlantDetails copyWith({
+    String? description,
+    String? imageUrl,
+    Map<String, String>? careGuide,
+    String? wikipediaUrl,
+  }) {
     return PlantDetails(
       id: id,
       commonName: commonName,
@@ -158,8 +167,8 @@ class PlantDetails {
       family: family,
       type: type,
       cycle: cycle,
-      description: description,
-      imageUrl: imageUrl,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
       watering: watering,
       wateringBenchmark: wateringBenchmark,
       sunlight: sunlight,
@@ -173,7 +182,8 @@ class PlantDetails {
       poisonousToHumans: poisonousToHumans,
       poisonousToPets: poisonousToPets,
       careGuideUrl: careGuideUrl,
-      careGuide: guide,
+      careGuide: careGuide ?? this.careGuide,
+      wikipediaUrl: wikipediaUrl ?? this.wikipediaUrl,
       isLimited: isLimited,
     );
   }

@@ -100,7 +100,7 @@ class PerenualService {
       try {
         final guideUri = Uri.parse(guideUrl.replaceFirst('http://', 'https://'));
         final guideJson = await _getCached(guideUri);
-        details = details.copyWithCareGuide(parseCareGuide(guideJson));
+        details = details.copyWith(careGuide: parseCareGuide(guideJson));
       } catch (_) {}
     }
 

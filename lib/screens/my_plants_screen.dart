@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/my_plant.dart';
 import '../services/database_service.dart';
+import '../widgets/watering.dart';
 import 'home_screen.dart';
 import 'plant_details_screen.dart';
 
@@ -125,6 +126,16 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                         onTap: () => openMyPlantDetails(context, plant),
                         onRemove: () =>
                             _confirmRemove(userId, plant),
+                        onWatered: () => markPlantWatered(
+                          context,
+                          userId: userId,
+                          plant: plant,
+                        ),
+                        onEditSchedule: () => editWateringSchedule(
+                          context,
+                          userId: userId,
+                          plant: plant,
+                        ),
                       );
                     },
                   );
@@ -143,16 +154,22 @@ class MyPlantCard extends StatelessWidget {
     this.compact = false,
     this.onTap,
     this.onRemove,
+    this.onWatered,
+    this.onEditSchedule,
   });
 
   final MyPlant plant;
   final bool compact;
   final VoidCallback? onTap;
   final VoidCallback? onRemove;
+  final VoidCallback? onWatered;
+  final VoidCallback? onEditSchedule;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final daysUntilWatering = plant.daysUntilWatering();
     final subtitle =
         plant.nickname != null ? plant.commonName : plant.scientificName;
 
@@ -167,7 +184,12 @@ class MyPlantCard extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                PlantThumbnail(url: plant.imageUrl, size: compact ? 40 : 56),
+                PlantThumbnailWithFallback(
+                  url: plant.imageUrl,
+                  scientificName: plant.scientificName,
+                  commonName: plant.commonName,
+                  size: compact ? 40 : 56,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -196,6 +218,41 @@ class MyPlantCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text('Water: ${plant.wateringSummary}'),
                         ],
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              wateringStatus(plant),
+                              style: daysUntilWatering != null &&
+                                      daysUntilWatering <= 0
+                                  ? textTheme.bodyMedium?.copyWith(
+                                      color: colors.error,
+                                      fontWeight: FontWeight.bold,
+                                    )
+                                  : textTheme.bodyMedium,
+                            ),
+                            if (onWatered != null && daysUntilWatering != null)
+                              TextButton.icon(
+                                onPressed: onWatered,
+                                icon: const Icon(
+                                  Icons.water_drop_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Watered'),
+                              ),
+                            if (onEditSchedule != null)
+                              TextButton(
+                                onPressed: onEditSchedule,
+                                child: Text(
+                                  plant.waterEveryDays == null
+                                      ? 'Set schedule'
+                                      : 'Every ${plant.waterEveryDays} days',
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ],
                   ),

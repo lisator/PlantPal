@@ -470,6 +470,36 @@ class DatabaseService {
         .delete();
   }
 
+  /// Records a watering. [at] defaults to now; pass the previous value to undo.
+  Future<void> setLastWatered({
+    required String userId,
+    required int perenualId,
+    DateTime? at,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc('$perenualId')
+        .update({
+      'lastWateredAt': at == null ? Timestamp.now() : Timestamp.fromDate(at),
+    });
+  }
+
+  /// Sets how often to water, or clears the schedule with null.
+  Future<void> setWaterEveryDays({
+    required String userId,
+    required int perenualId,
+    required int? days,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc('$perenualId')
+        .update({'waterEveryDays': days});
+  }
+
   Stream<List<MyPlant>> getMyPlants(
     String userId,
   ) {

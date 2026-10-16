@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/my_plant.dart';
 import '../services/database_service.dart';
 import '../widgets/reusable_widgets.dart';
+import '../widgets/watering.dart';
 
 import 'community_screen.dart';
 import 'my_plants_screen.dart';
@@ -171,6 +172,10 @@ class _DashboardScreenState
       _userId == null
           ? null
           : DatabaseService().getMyPlants(_userId);
+  late final Stream<List<MyPlant>>? _reminderPlants =
+      _userId == null
+          ? null
+          : DatabaseService().getMyPlants(_userId);
 
   Widget _buildSavedPlants(BuildContext context) {
     if (_myPlants == null) {
@@ -250,16 +255,35 @@ class _DashboardScreenState
     );
   }
 
-  final List<Map<String, dynamic>> _reminders = [
-    {
-      'message': 'Water your monstera today!',
-      'checked': false,
-    },
-    {
-      'message': 'Check the basil soil moisture.',
-      'checked': true,
-    },
-  ];
+  Widget _buildReminders(BuildContext context) {
+    final userId = _userId;
+    if (userId == null) {
+      return const Text(
+        'Sign in to get watering reminders.',
+      );
+    }
+
+    return StreamBuilder<List<MyPlant>>(
+      stream: _reminderPlants,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          debugPrint('Reminders error: ${snapshot.error}');
+          return const Text(
+            'Could not load your reminders.',
+          );
+        }
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+        return WateringRemindersCard(
+          userId: userId,
+          plants: snapshot.data!,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -287,30 +311,7 @@ class _DashboardScreenState
                   height: 12,
                 ),
 
-                for (
-                  int i = 0;
-                  i < _reminders.length;
-                  i++
-                )
-                  Padding(
-                    padding:
-                        const EdgeInsets.only(
-                      bottom: 12,
-                    ),
-                    child: ReminderCard(
-                      message:
-                          _reminders[i]['message'],
-                      isChecked:
-                          _reminders[i]['checked'],
-                      onChanged: (value) {
-                        setState(() {
-                          _reminders[i]
-                                  ['checked'] =
-                              value ?? false;
-                        });
-                      },
-                    ),
-                  ),
+                _buildReminders(context),
               ],
             ),
           ),

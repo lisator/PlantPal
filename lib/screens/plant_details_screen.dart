@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/my_plant.dart';
 import '../models/perenual_models.dart';
 import '../services/database_service.dart';
 import '../services/perenual_service.dart';
+import '../services/wikipedia_service.dart';
 import '../widgets/reusable_widgets.dart';
+import '../widgets/watering.dart';
 import 'home_screen.dart';
 
 void openPlantDetailsPage(BuildContext context, PlantSearchResult plant) {
@@ -14,6 +17,13 @@ void openPlantDetailsPage(BuildContext context, PlantSearchResult plant) {
     ),
   );
 }
+
+/// Perenual details, plus what Wikipedia filled in where Perenual had nothing.
+typedef _PlantPage = ({
+  PlantDetails details,
+  WikipediaSummary? wiki,
+  Map<CareTopic, String> careExcerpts,
+});
 
 /// Care details for a Perenual species. [preview] (from the search results)
 /// is shown in the header while the full details load.
@@ -28,7 +38,7 @@ class PlantDetailsScreen extends StatefulWidget {
 }
 
 class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
-  late Future<PlantDetails> _details;
+  late Future<_PlantPage> _page;
 
   @override
   void initState() {
@@ -37,24 +47,61 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   }
 
   void _load() {
+    _page = _loadPage();
+  }
+
+  Future<_PlantPage> _loadPage() async {
     final preview = widget.preview;
     // Skip the API call for species the free plan can't return; it would
     // just be refused and still count against the daily limit.
-    if (preview != null && !preview.hasFullDetails) {
-      _details = Future.value(PlantDetails.basic(preview));
-    } else {
-      _details = PerenualService.instance.getPlantDetails(widget.plantId);
+    final details = preview != null && !preview.hasFullDetails
+        ? PlantDetails.basic(preview)
+        : await PerenualService.instance.getPlantDetails(widget.plantId);
+    return _addWikipedia(details);
+  }
+
+  /// Fills in a missing description or image from Wikipedia, plus care
+  /// excerpts for any of Water/Light/Soil that Perenual has nothing for.
+  Future<_PlantPage> _addWikipedia(PlantDetails details) async {
+    final missingCare = CareTopic.values
+        .where((topic) => _perenualCare(details, topic) == null)
+        .toList();
+    if (details.description != null &&
+        details.imageUrl != null &&
+        missingCare.isEmpty) {
+      return (details: details, wiki: null, careExcerpts: const <CareTopic, String>{});
     }
+
+    final wiki = await WikipediaService.instance.findPlant(
+      scientificName: details.scientificName,
+      commonName: details.commonName,
+    );
+    if (wiki == null) {
+      return (details: details, wiki: null, careExcerpts: const <CareTopic, String>{});
+    }
+    final careExcerpts = missingCare.isEmpty
+        ? const <CareTopic, String>{}
+        : await WikipediaService.instance.careExcerpts(wiki);
+    return (
+      details: details.copyWith(
+        description: details.description ?? wiki.extract,
+        imageUrl: details.imageUrl ?? wiki.imageUrl,
+        wikipediaUrl: wiki.pageUrl,
+      ),
+      wiki: wiki,
+      careExcerpts: careExcerpts,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Plant care')),
-      body: FutureBuilder<PlantDetails>(
-        future: _details,
+      body: FutureBuilder<_PlantPage>(
+        future: _page,
         builder: (context, snapshot) {
-          final details = snapshot.data;
+          final page = snapshot.data;
+          final details = page?.details;
           final preview = widget.preview;
 
           return Align(
@@ -84,10 +131,17 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                           : 'Could not load care details.',
                       onRetry: () => setState(_load),
                     )
-                  else if (details != null) ...[
-                    _MyPlantButton(details: details),
+                  else if (page != null) ...[
+                    _MyPlantButton(
+                      details: page.details,
+                      wateringReference: _wateringReference(page),
+                    ),
                     const SizedBox(height: 20),
-                    _CareDetails(details: details),
+                    _CareDetails(
+                      details: page.details,
+                      wiki: page.wiki,
+                      careExcerpts: page.careExcerpts,
+                    ),
                   ],
                 ],
               ),
@@ -171,28 +225,53 @@ class _PlantHeader extends StatelessWidget {
   }
 }
 
+/// Perenual's text for a care topic, or null when Perenual has nothing.
+String? _perenualCare(PlantDetails details, CareTopic topic) {
+  String? withGuide(String? summary, String? guide) {
+    if (summary == null) return guide;
+    return guide == null ? summary : '$summary\n\n$guide';
+  }
+
+  switch (topic) {
+    case CareTopic.water:
+      final parts = [
+        if (details.watering != null) details.watering!,
+        if (details.wateringBenchmark != null)
+          details.wateringBenchmark!.toLowerCase(),
+      ];
+      return withGuide(
+        parts.isEmpty ? null : parts.join(' - '),
+        details.careGuide['watering'],
+      );
+    case CareTopic.light:
+      return withGuide(
+        details.sunlight.isEmpty ? null : details.sunlight.join(', '),
+        details.careGuide['sunlight'],
+      );
+    case CareTopic.soil:
+      return details.soil.isEmpty ? null : details.soil.join(', ');
+  }
+}
+
+/// Watering guidance shown while choosing a schedule: Perenual's text, else
+/// the Wikipedia excerpt. It's only a reference; the user picks the number.
+({String source, String text})? _wateringReference(_PlantPage page) {
+  final perenual = _perenualCare(page.details, CareTopic.water);
+  if (perenual != null) return (source: 'Perenual', text: perenual);
+  final wiki = page.careExcerpts[CareTopic.water];
+  return wiki == null ? null : (source: 'Wikipedia', text: wiki);
+}
+
 class _CareDetails extends StatelessWidget {
-  const _CareDetails({required this.details});
+  const _CareDetails({
+    required this.details,
+    required this.wiki,
+    required this.careExcerpts,
+  });
 
   final PlantDetails details;
-
-  String? _watering() {
-    final parts = [
-      if (details.watering != null) details.watering!,
-      if (details.wateringBenchmark != null) details.wateringBenchmark!.toLowerCase(),
-    ];
-    final summary = parts.isEmpty ? null : parts.join(' - ');
-    final guide = details.careGuide['watering'];
-    if (summary == null) return guide;
-    return guide == null ? summary : '$summary\n\n$guide';
-  }
-
-  String? _sunlight() {
-    final summary = details.sunlight.isEmpty ? null : details.sunlight.join(', ');
-    final guide = details.careGuide['sunlight'];
-    if (summary == null) return guide;
-    return guide == null ? summary : '$summary\n\n$guide';
-  }
+  final WikipediaSummary? wiki;
+  final Map<CareTopic, String> careExcerpts;
 
   String? _toxicity() {
     final pets = details.poisonousToPets;
@@ -205,18 +284,46 @@ class _CareDetails extends StatelessWidget {
     ].join('. ');
   }
 
+  /// Perenual's field when it has one, then a quoted Wikipedia excerpt, then
+  /// a "not available" note. Wikipedia text is never turned into a value.
+  Widget _careSection(CareTopic topic, IconData icon, String title) {
+    final perenual = _perenualCare(details, topic);
+    if (perenual != null) {
+      return PlantCareFact(icon: icon, title: title, description: perenual);
+    }
+    final excerpt = careExcerpts[topic];
+    if (excerpt != null && wiki != null) {
+      return _WikipediaCareFact(
+        icon: icon,
+        title: title,
+        excerpt: excerpt,
+        article: wiki!,
+      );
+    }
+    return PlantCareFact(
+      icon: icon,
+      title: title,
+      description: 'Details not available yet.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    final facts = <(IconData, String, String?)>[
-      (Icons.water_drop_outlined, 'Water', _watering()),
-      (Icons.wb_sunny_outlined, 'Light', _sunlight()),
-      (Icons.grass, 'Soil', details.soil.isEmpty ? null : details.soil.join(', ')),
+    final otherFacts = <(IconData, String, String?)>[
       (Icons.content_cut, 'Pruning', details.careGuide['pruning']),
       (Icons.thermostat_outlined, 'Hardiness', details.hardiness),
       (Icons.pets_outlined, 'Pet safety', _toxicity()),
-    ].where((fact) => fact.$3 != null).toList();
+    ].where((fact) => fact.$3 != null);
+
+    final rows = [
+      _careSection(CareTopic.water, Icons.water_drop_outlined, 'Water'),
+      _careSection(CareTopic.light, Icons.wb_sunny_outlined, 'Light'),
+      _careSection(CareTopic.soil, Icons.grass, 'Soil'),
+      for (final fact in otherFacts)
+        PlantCareFact(icon: fact.$1, title: fact.$2, description: fact.$3!),
+    ];
 
     final tags = [
       if (details.indoor == true) 'Indoor',
@@ -246,29 +353,26 @@ class _CareDetails extends StatelessWidget {
           const SizedBox(height: 24),
         ],
         Text('Care guide', style: textTheme.titleLarge),
-        const SizedBox(height: 8),
-        if (facts.isEmpty)
+        if (details.isLimited)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.only(top: 8),
             child: Text(
-              details.isLimited
-                  ? 'Care details for this plant are not included in our '
-                      'current Perenual plan. You can still add it to My Plants.'
-                  : 'Detailed care information is not available for this plant.',
+              'Care details for this plant are not included in our current '
+              'Perenual plan. You can still add it to My Plants.',
+              style: textTheme.bodySmall,
             ),
-          )
-        else
-          for (var i = 0; i < facts.length; i++) ...[
-            if (i > 0) const Divider(height: 1),
-            PlantCareFact(
-              icon: facts[i].$1,
-              title: facts[i].$2,
-              description: facts[i].$3!,
-            ),
-          ],
+          ),
+        const SizedBox(height: 8),
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) const Divider(height: 1),
+          rows[i],
+        ],
         const SizedBox(height: 16),
         Text(
-          'Plant data from Perenual',
+          details.wikipediaUrl == null
+              ? 'Plant data from Perenual'
+              : 'Plant data from Perenual. Additional text and images from '
+                  'Wikipedia (CC BY-SA): ${details.wikipediaUrl}',
           style: textTheme.bodySmall,
         ),
       ],
@@ -276,11 +380,93 @@ class _CareDetails extends StatelessWidget {
   }
 }
 
+/// A care section quoted from Wikipedia: the article's own words, labeled and
+/// linked, since care values can't be reliably pulled out of prose.
+class _WikipediaCareFact extends StatelessWidget {
+  const _WikipediaCareFact({
+    required this.icon,
+    required this.title,
+    required this.excerpt,
+    required this.article,
+  });
+
+  final IconData icon;
+  final String title;
+  final String excerpt;
+  final WikipediaSummary article;
+
+  Future<void> _openArticle(BuildContext context) async {
+    final opened = await launchUrl(
+      Uri.parse(article.pageUrl),
+      mode: LaunchMode.externalApplication,
+    ).catchError((_) => false);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Wikipedia.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: colors.primary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  'Excerpt from Wikipedia',
+                  style: textTheme.labelSmall
+                      ?.copyWith(color: colors.onSurfaceVariant),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.only(left: 10),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(color: colors.outlineVariant, width: 3),
+                    ),
+                  ),
+                  child: Text(
+                    excerpt,
+                    style: textTheme.bodyMedium
+                        ?.copyWith(fontStyle: FontStyle.italic),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _openArticle(context),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('Read more on Wikipedia'),
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          PlantThumbnail(url: article.thumbnailUrl, size: 56),
+        ],
+      ),
+    );
+  }
+}
+
 /// "Add to My Plants" / "In My Plants" toggle for the details page.
 class _MyPlantButton extends StatefulWidget {
-  const _MyPlantButton({required this.details});
+  const _MyPlantButton({required this.details, this.wateringReference});
 
   final PlantDetails details;
+  final ({String source, String text})? wateringReference;
 
   @override
   State<_MyPlantButton> createState() => _MyPlantButtonState();
@@ -303,9 +489,17 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
   }
 
   Future<void> _add() async {
-    final input = await showDialog<({String nickname, String location})>(
+    final input = await showDialog<
+        ({String nickname, String location, int? waterEveryDays})>(
       context: context,
-      builder: (context) => _AddPlantDialog(plantName: widget.details.commonName),
+      builder: (context) => _AddPlantDialog(
+        plantName: widget.details.commonName,
+        suggestedWaterEveryDays: suggestedWaterEveryDays(
+          benchmark: widget.details.wateringBenchmark,
+          watering: widget.details.watering,
+        ),
+        wateringReference: widget.wateringReference,
+      ),
     );
     if (input == null || !mounted) return;
 
@@ -317,6 +511,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
           widget.details,
           nickname: input.nickname,
           location: input.location,
+          waterEveryDays: input.waterEveryDays,
         ),
       );
       if (!mounted) return;
@@ -391,56 +586,102 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
 }
 
 class _AddPlantDialog extends StatefulWidget {
-  const _AddPlantDialog({required this.plantName});
+  const _AddPlantDialog({
+    required this.plantName,
+    this.suggestedWaterEveryDays,
+    this.wateringReference,
+  });
 
   final String plantName;
+  final int? suggestedWaterEveryDays;
+  final ({String source, String text})? wateringReference;
 
   @override
   State<_AddPlantDialog> createState() => _AddPlantDialogState();
 }
 
 class _AddPlantDialogState extends State<_AddPlantDialog> {
+  final _formKey = GlobalKey<FormState>();
   final _nickname = TextEditingController();
   final _location = TextEditingController();
+  late final _waterEveryDays = TextEditingController(
+    text: '${widget.suggestedWaterEveryDays ?? ''}',
+  );
 
   @override
   void dispose() {
     _nickname.dispose();
     _location.dispose();
+    _waterEveryDays.dispose();
     super.dispose();
   }
 
   void _submit() {
-    Navigator.pop(context, (nickname: _nickname.text, location: _location.text));
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(context, (
+      nickname: _nickname.text,
+      location: _location.text,
+      waterEveryDays: parseWaterEveryDays(_waterEveryDays.text),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final reference = widget.wateringReference;
+
     return AlertDialog(
       title: Text('Add ${widget.plantName}'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _nickname,
-            autofocus: true,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'Nickname (optional)',
-              hintText: 'e.g. Monty',
-            ),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _nickname,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Nickname (optional)',
+                  hintText: 'e.g. Monty',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _location,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Location (optional)',
+                  hintText: 'e.g. Living room',
+                ),
+              ),
+              const SizedBox(height: 12),
+              WaterEveryDaysField(
+                controller: _waterEveryDays,
+                onSubmitted: _submit,
+                helperText: widget.suggestedWaterEveryDays != null
+                    ? 'Suggested from Perenual. Adjust it for your home.'
+                    : 'Perenual has no schedule for this plant. Leave blank '
+                        'to set one later from My Plants.',
+              ),
+              if (reference != null &&
+                  widget.suggestedWaterEveryDays == null) ...[
+                const SizedBox(height: 12),
+                Text('${reference.source} says:', style: textTheme.labelSmall),
+                const SizedBox(height: 4),
+                Text(
+                  reference.text,
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall
+                      ?.copyWith(fontStyle: FontStyle.italic),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _location,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            decoration: const InputDecoration(
-              labelText: 'Location (optional)',
-              hintText: 'e.g. Living room',
-            ),
-          ),
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -518,6 +759,53 @@ class PlantThumbnail extends StatelessWidget {
                 loadingBuilder: (context, child, progress) =>
                     progress == null ? child : fallback,
               ),
+      ),
+    );
+  }
+}
+
+/// [PlantThumbnail] that looks up a Wikipedia image when [url] is missing.
+class PlantThumbnailWithFallback extends StatefulWidget {
+  const PlantThumbnailWithFallback({
+    super.key,
+    this.url,
+    required this.scientificName,
+    required this.commonName,
+    required this.size,
+  });
+
+  final String? url;
+  final String scientificName;
+  final String commonName;
+  final double size;
+
+  @override
+  State<PlantThumbnailWithFallback> createState() =>
+      _PlantThumbnailWithFallbackState();
+}
+
+class _PlantThumbnailWithFallbackState extends State<PlantThumbnailWithFallback> {
+  Future<WikipediaSummary?>? _wiki;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.url == null) {
+      _wiki = WikipediaService.instance.findPlant(
+        scientificName: widget.scientificName,
+        commonName: widget.commonName,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_wiki == null) return PlantThumbnail(url: widget.url, size: widget.size);
+    return FutureBuilder<WikipediaSummary?>(
+      future: _wiki,
+      builder: (context, snapshot) => PlantThumbnail(
+        url: snapshot.data?.thumbnailUrl,
+        size: widget.size,
       ),
     );
   }

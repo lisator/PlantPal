@@ -16,7 +16,7 @@ class _PlantSearchState extends State<PlantSearch> {
     'Monstera',
     'Pothos',
     'Snake plant',
-    'Basil',
+    'Peace lily',
     'Fern',
     'Aloe',
   ];
@@ -149,7 +149,7 @@ class _PlantSearchState extends State<PlantSearch> {
                       textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
                         labelText: 'Search by plant name',
-                        hintText: 'e.g. monstera, basil, fern',
+                        hintText: 'e.g. monstera, pothos, fern',
                         helperText: 'Press Enter to search',
                         prefixIcon: IconButton(
                           tooltip: 'Search',
@@ -285,7 +285,12 @@ class PlantSearchResultCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              PlantThumbnail(url: plant.thumbnailUrl, size: 48),
+              PlantThumbnailWithFallback(
+                url: plant.thumbnailUrl,
+                scientificName: plant.scientificName,
+                commonName: plant.commonName,
+                size: 48,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
