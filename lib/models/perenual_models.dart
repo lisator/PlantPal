@@ -241,6 +241,8 @@ class PlantDetails {
 }
 
 /// Parses the care guide list response into {section type: description}.
+/// 
+///-------------------- THIS NEEDS TO BE MORE DETAILED SO THE WIKIPEDIA DESCRIPTION CAN BE MORE CONSISE!!!!! ----------------------
 Map<String, String> parseCareGuide(Map<String, dynamic> json) {
   final guide = <String, String>{};
   final data = json['data'];
