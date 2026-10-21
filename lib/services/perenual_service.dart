@@ -38,6 +38,11 @@ class PerenualService {
   static const Duration _cacheDuration = Duration(days: 7);
   static const String _cachePrefix = 'perenual_cache:';
 
+  /// Requests allowed per day on the free plan.
+  static const int _dailyLimit = 100;
+  static const String _countDateKey = 'perenual_requests_date';
+  static const String _countKey = 'perenual_requests_count';
+
   final Map<String, PlantSearchPage> _searchCache = {};
   final Map<int, PlantDetails> _detailsCache = {};
   String? _apiKey;
@@ -68,6 +73,8 @@ class PerenualService {
     );
   }
 
+  /// Searches indoor plants only. PlantPal is for houseplants, and outdoor
+  /// species rarely have indoor care info on Perenual or Wikipedia.
   Future<PlantSearchPage> searchPlants(String query, {int page = 1}) async {
     final normalized = query.trim().toLowerCase();
     final cacheKey = '$normalized|$page';
@@ -78,6 +85,7 @@ class PerenualService {
       queryParameters: {
         'q': normalized,
         'page': '$page',
+        'indoor': '1',
       },
     ));
 
@@ -140,8 +148,37 @@ class PerenualService {
     return body;
   }
 
+  /// Logs each real (not cached) request with how many this device has sent
+  /// today, e.g. "Perenual request 12/100 today (88 left per Perenual):
+  /// /api/v2/species-list?q=fern&page=1".
+  ///
+  /// The device keeps its own count because Perenual's remaining-quota
+  /// header can't be read in the web build (browsers hide it). When the
+  /// header is readable, it's shown too. The count is per device, while the
+  /// limit is shared by everyone using the same API key.
+  Future<void> _logRequest(Uri uri, http.Response response) async {
+    var count = 1;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (prefs.getString(_countDateKey) == today) {
+        count = (prefs.getInt(_countKey) ?? 0) + 1;
+      }
+      await prefs.setString(_countDateKey, today);
+      await prefs.setInt(_countKey, count);
+    } catch (_) {
+      // Counting is only for the log; never let it break a request.
+    }
+
+    final remaining = response.headers['x-ratelimit-remaining'];
+    debugPrint(
+      'Perenual request $count/$_dailyLimit today'
+      '${remaining == null ? '' : ' ($remaining left per Perenual)'}'
+      ': ${uri.path}?${uri.query} -> HTTP ${response.statusCode}',
+    );
+  }
+
   Future<Map<String, dynamic>> _get(Uri uri) async {
-    debugPrint('Perenual request: ${uri.path}?${uri.query}');
     final key = await _getApiKey();
 
     final http.Response response;
@@ -159,11 +196,7 @@ class PerenualService {
       );
     }
 
-    debugPrint(
-      'Perenual requests left today: '
-      '${response.headers['x-ratelimit-remaining'] ?? 'unknown'}'
-      '/${response.headers['x-ratelimit-limit'] ?? '100'}',
-    );
+    await _logRequest(uri, response);
 
     if (response.statusCode == 429) {
       // Perenual also uses 429 for species outside the free plan.

@@ -21,8 +21,7 @@ void openPlantDetailsPage(BuildContext context, PlantSearchResult plant) {
 /// Perenual details, plus what Wikipedia filled in where Perenual had nothing.
 typedef _PlantPage = ({
   PlantDetails details,
-  WikipediaSummary? wiki,
-  Map<CareTopic, String> careExcerpts,
+  Map<CareTopic, CareExcerpt> careExcerpts,
 });
 
 /// Care details for a Perenual species. [preview] (from the search results)
@@ -66,29 +65,28 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
     final missingCare = CareTopic.values
         .where((topic) => _perenualCare(details, topic) == null)
         .toList();
-    if (details.description != null &&
-        details.imageUrl != null &&
-        missingCare.isEmpty) {
-      return (details: details, wiki: null, careExcerpts: const <CareTopic, String>{});
-    }
-
-    final wiki = await WikipediaService.instance.findPlant(
-      scientificName: details.scientificName,
-      commonName: details.commonName,
-    );
+    final needsWikipedia = details.description == null ||
+        details.imageUrl == null ||
+        missingCare.isNotEmpty;
+    final wiki = needsWikipedia
+        ? await WikipediaService.instance.findPlant(
+            scientificName: details.scientificName,
+            commonName: details.commonName,
+          )
+        : null;
     if (wiki == null) {
-      return (details: details, wiki: null, careExcerpts: const <CareTopic, String>{});
+      return (details: details, careExcerpts: const <CareTopic, CareExcerpt>{});
     }
     final careExcerpts = missingCare.isEmpty
-        ? const <CareTopic, String>{}
-        : await WikipediaService.instance.careExcerpts(wiki);
+        ? const <CareTopic, CareExcerpt>{}
+        : await WikipediaService.instance
+            .plantCare(wiki, scientificName: details.scientificName);
     return (
       details: details.copyWith(
         description: details.description ?? wiki.extract,
         imageUrl: details.imageUrl ?? wiki.imageUrl,
         wikipediaUrl: wiki.pageUrl,
       ),
-      wiki: wiki,
       careExcerpts: careExcerpts,
     );
   }
@@ -139,7 +137,6 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                     const SizedBox(height: 20),
                     _CareDetails(
                       details: page.details,
-                      wiki: page.wiki,
                       careExcerpts: page.careExcerpts,
                     ),
                   ],
@@ -259,19 +256,17 @@ String? _perenualCare(PlantDetails details, CareTopic topic) {
   final perenual = _perenualCare(page.details, CareTopic.water);
   if (perenual != null) return (source: 'Perenual', text: perenual);
   final wiki = page.careExcerpts[CareTopic.water];
-  return wiki == null ? null : (source: 'Wikipedia', text: wiki);
+  return wiki == null ? null : (source: 'Wikipedia', text: wiki.text);
 }
 
 class _CareDetails extends StatelessWidget {
   const _CareDetails({
     required this.details,
-    required this.wiki,
     required this.careExcerpts,
   });
 
   final PlantDetails details;
-  final WikipediaSummary? wiki;
-  final Map<CareTopic, String> careExcerpts;
+  final Map<CareTopic, CareExcerpt> careExcerpts;
 
   String? _toxicity() {
     final pets = details.poisonousToPets;
@@ -292,13 +287,8 @@ class _CareDetails extends StatelessWidget {
       return PlantCareFact(icon: icon, title: title, description: perenual);
     }
     final excerpt = careExcerpts[topic];
-    if (excerpt != null && wiki != null) {
-      return _WikipediaCareFact(
-        icon: icon,
-        title: title,
-        excerpt: excerpt,
-        article: wiki!,
-      );
+    if (excerpt != null) {
+      return _WikipediaCareFact(icon: icon, title: title, excerpt: excerpt);
     }
     return PlantCareFact(
       icon: icon,
@@ -387,13 +377,13 @@ class _WikipediaCareFact extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.excerpt,
-    required this.article,
   });
 
   final IconData icon;
   final String title;
-  final String excerpt;
-  final WikipediaSummary article;
+  final CareExcerpt excerpt;
+
+  WikipediaSummary get article => excerpt.article;
 
   Future<void> _openArticle(BuildContext context) async {
     final opened = await launchUrl(
@@ -426,7 +416,7 @@ class _WikipediaCareFact extends StatelessWidget {
                 Text(title, style: textTheme.titleSmall),
                 const SizedBox(height: 2),
                 Text(
-                  'Excerpt from Wikipedia',
+                  excerpt.sourceLabel,
                   style: textTheme.labelSmall
                       ?.copyWith(color: colors.onSurfaceVariant),
                 ),
@@ -439,7 +429,7 @@ class _WikipediaCareFact extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    excerpt,
+                    excerpt.text,
                     style: textTheme.bodyMedium
                         ?.copyWith(fontStyle: FontStyle.italic),
                   ),

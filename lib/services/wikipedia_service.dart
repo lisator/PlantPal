@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'care_ai_service.dart';
 
 /// The parts of a Wikipedia article summary PlantPal uses.
 class WikipediaSummary {
@@ -84,13 +87,18 @@ class WikipediaService {
   static const Duration _timeout = Duration(seconds: 10);
   static const Duration _cacheDuration = Duration(days: 30);
   static const String _cachePrefix = 'wikipedia_cache:';
-  // Bump the version when extractCareExcerpts changes, so old picks are dropped.
-  static const String _careCachePrefix = 'wikipedia_care_v1:';
+  // Change the name when the care prompt changes, so old picks are dropped.
+  static const String _careCollection = 'plant_care_v2';
 
-  /// Wikimedia asks API clients to identify themselves. Browsers don't allow
-  /// setting User-Agent, so this is the header they read instead.
+  /// Wikimedia requires API clients to identify themselves, and quickly
+  /// blocks (HTTP 429) the generic "Dart/x.y" User-Agent that apps send by
+  /// default. Browsers don't allow setting User-Agent, so on the web the
+  /// Api-User-Agent header is read instead.
+  static const String _userAgent =
+      'PlantPal/1.0 (https://github.com/lisator/PlantPal; student plant care app)';
   static const Map<String, String> _headers = {
-    'Api-User-Agent': 'PlantPal/1.0 (student plant care app)',
+    'Api-User-Agent': _userAgent,
+    if (!kIsWeb) 'User-Agent': _userAgent,
   };
 
   final Map<String, Future<WikipediaSummary?>> _summaries = {};
@@ -110,8 +118,38 @@ class WikipediaService {
     return null;
   }
 
-  /// Care sentences quoted from [article]'s cultivation sections, by topic.
-  /// Topics the article doesn't cover are left out.
+  /// Care excerpts for a plant: from its own [article] first, then from its
+  /// genus's article (e.g. "Begonia") for any topic the species article
+  /// doesn't cover. Many species articles have no care section, but the
+  /// genus article often describes care for the whole group.
+  Future<Map<CareTopic, CareExcerpt>> plantCare(
+    WikipediaSummary article, {
+    required String scientificName,
+  }) async {
+    final care = {
+      for (final MapEntry(:key, :value) in (await careExcerpts(article)).entries)
+        key: CareExcerpt(text: value, article: article),
+    };
+    if (care.length == CareTopic.values.length) return care;
+
+    final genusName = speciesTitle(scientificName).split(' ').first;
+    if (genusName.isNotEmpty &&
+        genusName.toLowerCase() != article.title.toLowerCase()) {
+      final genus = await _summary(genusName);
+      if (genus != null && genus.title != article.title) {
+        for (final MapEntry(:key, :value) in (await careExcerpts(genus)).entries) {
+          care.putIfAbsent(
+            key,
+            () => CareExcerpt(text: value, article: genus, fromGenus: true),
+          );
+        }
+      }
+    }
+    return care;
+  }
+
+  /// Care sentences quoted from [article], by topic. Topics the article
+  /// doesn't cover are left out.
   Future<Map<CareTopic, String>> careExcerpts(WikipediaSummary article) {
     return _careExcerpts[article.title] ??= _loadCareExcerpts(article.title);
   }
@@ -133,26 +171,64 @@ class WikipediaService {
     }
   }
 
+  /// 1. Use the excerpts saved in Firestore, if any user has opened this
+  ///    plant before.
+  /// 2. Otherwise fetch the article and have Gemini pick sentences from its
+  ///    care sections, then save them to Firestore so nobody has to ask
+  ///    Gemini again. Articles without care sections skip Gemini entirely.
+  /// 3. If Gemini fails (offline, free-tier limit), use the keyword parser.
+  ///    That result isn't saved, so Gemini is tried again next time.
   Future<Map<CareTopic, String>> _loadCareExcerpts(String title) async {
+    final saved = await _savedCare(title);
+    if (saved != null) return saved;
+
     try {
-      // Only the excerpts are cached; whole articles are too big to keep.
-      final body = await _cachedJson(_careCachePrefix + title, () async {
-        final text = await _fetchArticleText(title);
-        if (text == null) return <String, String>{};
-        return {
-          for (final entry in extractCareExcerpts(text).entries)
-            entry.key.name: entry.value,
-        };
-      });
-      if (body is! Map) return const {};
-      return {
-        for (final topic in CareTopic.values)
-          if (body[topic.name] is String) topic: body[topic.name] as String,
-      };
+      final text = await _fetchArticleText(title);
+      if (text == null) return const {};
+      final careText = careSectionsText(text);
+      if (careText.isEmpty) return const {};
+
+      final picked = await CareAiService.instance.pickExcerpts(careText);
+      if (picked != null) {
+        await _saveCare(title, picked);
+        return picked;
+      }
+      return extractCareExcerpts(text);
     } catch (e) {
       debugPrint('Wikipedia care lookup for "$title" failed: $e');
       _careExcerpts.remove(title);
       return const {};
+    }
+  }
+
+  /// Gemini's picks, shared by all users: one document per article title.
+  DocumentReference<Map<String, dynamic>> _careDoc(String title) =>
+      FirebaseFirestore.instance
+          .collection(_careCollection)
+          .doc(title.replaceAll('/', '_'));
+
+  Future<Map<CareTopic, String>?> _savedCare(String title) async {
+    try {
+      final data = (await _careDoc(title).get()).data();
+      if (data == null) return null;
+      return {
+        for (final topic in CareTopic.values)
+          if (data[topic.name] is String) topic: data[topic.name] as String,
+      };
+    } catch (e) {
+      debugPrint('Reading saved care for "$title" failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _saveCare(String title, Map<CareTopic, String> excerpts) async {
+    try {
+      await _careDoc(title).set({
+        for (final entry in excerpts.entries) entry.key.name: entry.value,
+        'savedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Saving care for "$title" failed: $e');
     }
   }
 
@@ -244,18 +320,35 @@ class WikipediaService {
 /// Care sections on the plant details page that can fall back to Wikipedia.
 enum CareTopic { water, light, soil }
 
-/// Picks sentences about each [CareTopic] from a plain-text Wikipedia
-/// article, as written.
-///
-/// Wikipedia doesn't have structured care data, so these sentences are meant
-/// to be shown as quotes, never turned into values like "every 7 days". Only
-/// cultivation/care sections are used (not habitat, which describes the wild),
-/// and sentences from indoor/houseplant sections come first.
-Map<CareTopic, String> extractCareExcerpts(String article) {
-  final candidates = <CareTopic, List<(bool, String)>>{
-    for (final topic in CareTopic.values) topic: [],
-  };
+/// A care excerpt and the article it was quoted from.
+class CareExcerpt {
+  const CareExcerpt({
+    required this.text,
+    required this.article,
+    this.fromGenus = false,
+  });
 
+  final String text;
+
+  /// The article the text was quoted from (the plant's, or its genus's).
+  final WikipediaSummary article;
+
+  /// True when the plant's own article had nothing on this topic, so the
+  /// excerpt describes its genus (e.g. all begonias) instead.
+  final bool fromGenus;
+
+  /// Where the text came from, shown above it on the details page.
+  String get sourceLabel => fromGenus
+      ? 'Excerpt from Wikipedia, about the ${article.title} genus'
+      : 'Excerpt from Wikipedia';
+}
+
+/// The paragraphs of a plain-text article that are in a care section
+/// ("Cultivation", "Care", "As a houseplant", ...), and whether that section
+/// is about growing indoors. Habitat, history, and other sections are left
+/// out. Both Gemini and the keyword parser only look at these.
+List<({String text, bool indoor})> careParagraphs(String article) {
+  final paragraphs = <({String text, bool indoor})>[];
   var inCareSection = false;
   var isIndoorSection = false;
   for (final line in article.split('\n')) {
@@ -272,51 +365,195 @@ Map<CareTopic, String> extractCareExcerpts(String article) {
       }
       continue;
     }
-    if (!inCareSection) continue;
+    final text = line.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (inCareSection && text.isNotEmpty) {
+      paragraphs.add((text: text, indoor: isIndoorSection));
+    }
+  }
+  return paragraphs;
+}
 
-    for (final sentence in line.trim().split(RegExp(r'(?<=[.!?])\s+(?=[A-Z])'))) {
-      if (sentence.isEmpty ||
+/// The care sections of [article] as one block of text ('' if it has none).
+String careSectionsText(String article) =>
+    careParagraphs(article).map((p) => p.text).join('\n');
+
+/// Splits [text] into sentences at ". ", "! " or "? " before a capital.
+List<String> splitSentences(String text) =>
+    text.trim().split(RegExp(r'(?<=[.!?])\s+(?=[A-Z])'));
+
+/// Backup for when [CareAiService] can't be reached: picks sentences about
+/// each [CareTopic] from a plain-text Wikipedia article, as written.
+///
+/// Wikipedia doesn't have structured care data, so these sentences are meant
+/// to be shown as quotes, never turned into values like "every 7 days". Only
+/// cultivation/care sections are used (not habitat, which describes the wild),
+/// and sentences from indoor/houseplant sections come first.
+///
+/// A keyword alone isn't enough: each sentence is scored on how strongly it
+/// matches the topic, whether it reads like care advice ("prefers", "needs",
+/// "should"), and whether it drifts into history, research, sowing, and so on.
+/// Only sentences that clear [_minScore] are kept, and a second sentence is
+/// added only if the excerpt stays short.
+Map<CareTopic, String> extractCareExcerpts(String article) {
+  final candidates = <CareTopic, List<_Candidate>>{
+    for (final topic in CareTopic.values) topic: [],
+  };
+
+  for (final (:text, :indoor) in careParagraphs(article)) {
+    final isIndoorSection = indoor;
+    for (final sentence in splitSentences(text)) {
+      if (sentence.length < _minSentenceLength ||
           sentence.length > _maxSentenceLength ||
           _skipSentence.hasMatch(sentence)) {
         continue;
       }
-      final isWater = _waterPattern.hasMatch(sentence);
-      final matches = {
-        CareTopic.water: isWater,
-        CareTopic.light: _lightPattern.hasMatch(sentence),
-        // "Water when the soil feels dry" is about watering, not soil.
-        CareTopic.soil: _soilMaterialPattern.hasMatch(sentence) ||
-            (!isWater && RegExp(r'\bsoils?\b', caseSensitive: false).hasMatch(sentence)),
+      // "Dry matter"/"dry weight" are lab measurements, not watering.
+      final forMatching = sentence.replaceAll(
+        RegExp(r'\bdry (matter|weight|mass)\b', caseSensitive: false),
+        '',
+      );
+      final hits = {
+        CareTopic.water: _waterHits(forMatching),
+        CareTopic.light: _count(_lightPattern, forMatching) * 2,
+        CareTopic.soil: _soilHits(forMatching),
       };
+
+      var shared = 0;
+      if (_adviceCue.hasMatch(sentence)) shared += 2;
+      if (isIndoorSection) shared += 1;
+      // PlantPal is for houseplants, so garden/outdoor advice ranks last.
+      if (_indoorSentence.hasMatch(sentence)) {
+        shared += 2;
+      } else if (_outdoorSentence.hasMatch(sentence)) {
+        shared -= 2;
+      }
+      shared -= 4 * _count(_offTopic, sentence);
+      if (sentence.length > 180) shared -= 1;
+
       for (final topic in CareTopic.values) {
-        if (matches[topic]!) candidates[topic]!.add((isIndoorSection, sentence));
+        final topicHits = hits[topic]!;
+        if (topicHits == 0) continue;
+        final score = topicHits + shared;
+        if (score >= _minScore) {
+          candidates[topic]!.add((
+            sentence: sentence,
+            score: score,
+            indoor: isIndoorSection,
+          ));
+        }
       }
     }
   }
 
-  return {
-    for (final MapEntry(key: topic, value: sentences) in candidates.entries)
-      if (sentences.isNotEmpty)
-        topic: ([...sentences.where((s) => s.$1), ...sentences.where((s) => !s.$1)])
-            .take(_maxSentencesPerTopic)
-            .map((s) => s.$2)
-            .join(' '),
-  };
+  final excerpts = <CareTopic, String>{};
+  for (final MapEntry(key: topic, value: options) in candidates.entries) {
+    if (options.isEmpty) continue;
+    // Indoor sections first, then the best score, then the shorter sentence.
+    options.sort((a, b) {
+      if (a.indoor != b.indoor) return a.indoor ? -1 : 1;
+      if (a.score != b.score) return b.score.compareTo(a.score);
+      return a.sentence.length.compareTo(b.sentence.length);
+    });
+    final best = options.first;
+    var excerpt = best.sentence;
+    for (final next in options.skip(1)) {
+      if (next.sentence == best.sentence) continue;
+      if (excerpt.length + next.sentence.length < _maxExcerptLength) {
+        excerpt = '$excerpt ${next.sentence}';
+      }
+      break;
+    }
+    excerpts[topic] = excerpt;
+  }
+  return excerpts;
 }
 
-const int _maxSentencesPerTopic = 2;
-const int _maxSentenceLength = 350;
+typedef _Candidate = ({String sentence, int score, bool indoor});
+
+const int _minScore = 4;
+const int _minSentenceLength = 15;
+const int _maxSentenceLength = 240;
+const int _maxExcerptLength = 260;
+
+int _count(RegExp pattern, String text) => pattern.allMatches(text).length.clamp(0, 2);
+
+/// Strong watering words count double. Weak ones ("dry", "moisture") only
+/// count when the sentence is about the plant's soil or pot, so climate
+/// descriptions like "wet winters and dry summers" are skipped.
+int _waterHits(String sentence) {
+  final strong = _count(_waterPattern, sentence);
+  if (strong > 0) return strong * 2;
+  if (_weakWaterPattern.hasMatch(sentence) && _potContext.hasMatch(sentence)) {
+    return 2;
+  }
+  return 0;
+}
+
+/// Soil materials ("peat", "well-draining") count double; a bare "soil" counts
+/// once, unless the sentence is really about watering ("water when the soil
+/// feels dry").
+int _soilHits(String sentence) {
+  final materials = _count(_soilMaterialPattern, sentence);
+  if (materials > 0) return materials * 2;
+  final isWater = _waterHits(sentence) > 0;
+  return !isWater && RegExp(r'\bsoils?\b', caseSensitive: false).hasMatch(sentence)
+      ? 1
+      : 0;
+}
+
+/// Wording that reads like care advice rather than description.
+final RegExp _adviceCue = RegExp(
+  r'\b(prefers?|preferr\w*|needs?|needed|requires?|requiring|required|should|best'
+  r'|ideal\w*|thrives?|tolerat\w*|tolerant|avoid\w*|keep|kept|allow\w*|recommended'
+  r'|must|does well|grows? well|benefits?|suscept\w*|sensitive|enjoys?|likes?)\b',
+  caseSensitive: false,
+);
+
+final RegExp _indoorSentence = RegExp(
+  r'\b(indoors?|houseplants?|house plants?|potted|in pots?|containers?)\b',
+  caseSensitive: false,
+);
+
+final RegExp _outdoorSentence = RegExp(
+  r'\b(outdoors?|outside|gardens?|landscap\w*|borders?|lawns?|hedges?|in the ground)\b',
+  caseSensitive: false,
+);
+
+/// Sentences about history, the wild, research, sowing, pests, frost, or uses
+/// mention water/light/soil in passing but aren't advice for a potted plant.
+final RegExp _offTopic = RegExp(
+  r'\b(originat\w*|introduced|native|habitats?|in the wild|centur\w*|named|discover\w*'
+  r'|research\w*|stud(y|ies)|photosynth\w*|yields?|harvest\w*|sown|sow|sowing|seeds?'
+  r'|seedlings?|germinat\w*|frosts?|pests?|diseases?|toxic\w*|edible|culinary'
+  r'|1[5-9]\d\d|20\d\d)\b',
+  caseSensitive: false,
+);
 
 final RegExp _careHeading =
     RegExp(r'cultivat|\bcare\b|growing|horticultur|houseplant|indoor', caseSensitive: false);
 final RegExp _indoorHeading = RegExp(r'indoor|houseplant', caseSensitive: false);
 
 /// Propagation and nursery sentences mention soil and water but aren't care advice.
-final RegExp _skipSentence =
-    RegExp(r'propagat|\bcuttings?\b|commercially|tissue culture', caseSensitive: false);
+final RegExp _skipSentence = RegExp(
+  r'propagat|\bcuttings?\b|commercially|tissue culture|\bdivid(e|ed|ing)\b|\bdivision\b',
+  caseSensitive: false,
+);
 
 final RegExp _waterPattern = RegExp(
-  r'\b(watered|watering|waterings|overwater\w*|underwater(ed|ing)|moist\w*|drought\w*|dry|dries|dried|drying)\b',
+  r'\b(watered|watering|waterings|overwater\w*|underwater(ed|ing)|waterlogged'
+  r'|(kept|keep|kept evenly|stay|remain) moist|moist (but|soil|compost|substrate)'
+  r'|(dry|dried|dries) out|drought[- ]toleran\w*|toleran\w* (of|to) drought'
+  r'|(consistent|regular|frequent|plenty of|little) water|soggy|root rot)\b',
+  caseSensitive: false,
+);
+
+final RegExp _weakWaterPattern = RegExp(
+  r'\b(moist\w*|drought\w*|dry|dries|dried|drying|wet|damp)\b',
+  caseSensitive: false,
+);
+
+final RegExp _potContext = RegExp(
+  r'\b(soil|substrate|compost|pots?|potted|roots?|tubers?|rhizomes?|mix|kept|keep)\b',
   caseSensitive: false,
 );
 
