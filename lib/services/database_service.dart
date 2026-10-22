@@ -1,9 +1,11 @@
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/my_plant.dart';
 
 class DatabaseService {
-  final FirebaseFirestore _db =
-      FirebaseFirestore.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
  
   Future<void> addUser({
@@ -26,35 +28,24 @@ class DatabaseService {
   Future<DocumentSnapshot<Map<String, dynamic>>> getUser(
     String uid,
   ) async {
-    return await _db
-        .collection('users')
-        .doc(uid)
-        .get();
+    return await _db.collection('users').doc(uid).get();
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(
     String uid,
   ) {
-    return _db
-        .collection('users')
-        .doc(uid)
-        .snapshots();
+    return _db.collection('users').doc(uid).snapshots();
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getUsers() {
-    return _db
-        .collection('users')
-        .snapshots();
+    return _db.collection('users').snapshots();
   }
 
   Future<void> updateUser({
     required String uid,
     required Map<String, dynamic> data,
   }) async {
-    await _db
-        .collection('users')
-        .doc(uid)
-        .update(data);
+    await _db.collection('users').doc(uid).update(data);
   }
 
   Future<void> ensureUserExists({
@@ -62,11 +53,8 @@ class DatabaseService {
     required String email,
     String displayName = '',
   }) async {
-    final userRef =
-        _db.collection('users').doc(uid);
-
-    final userDocument =
-        await userRef.get();
+    final userRef = _db.collection('users').doc(uid);
+    final userDocument = await userRef.get();
 
     if (!userDocument.exists) {
       await userRef.set({
@@ -76,8 +64,7 @@ class DatabaseService {
         'username': '',
         'usernameLower': '',
         'bio': '',
-        'createdAt':
-            FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
       });
     }
   }
@@ -86,15 +73,11 @@ class DatabaseService {
     String username, {
     String? currentUid,
   }) async {
-    final usernameLower =
-        username.trim().toLowerCase();
+    final usernameLower = username.trim().toLowerCase();
 
     final result = await _db
         .collection('users')
-        .where(
-          'usernameLower',
-          isEqualTo: usernameLower,
-        )
+        .where('usernameLower', isEqualTo: usernameLower)
         .limit(1)
         .get();
 
@@ -119,34 +102,24 @@ class DatabaseService {
     final Map<String, dynamic> updates = {};
 
     if (displayName != null) {
-      updates['displayName'] =
-          displayName.trim();
+      updates['displayName'] = displayName.trim();
     }
 
     if (username != null) {
-      updates['username'] =
-          username.trim();
-
+      updates['username'] = username.trim();
       updates['usernameLower'] =
           username.trim().toLowerCase();
     }
 
     if (bio != null) {
-      updates['bio'] =
-          bio.trim();
+      updates['bio'] = bio.trim();
     }
 
     if (updates.isNotEmpty) {
-      await _db
-          .collection('users')
-          .doc(uid)
-          .update(updates);
+      await _db.collection('users').doc(uid).update(updates);
     }
   }
 
-  // =========================================================
-  // FOLLOWING
-  // =========================================================
 
   Future<void> followUser({
     required String currentUserId,
@@ -170,23 +143,15 @@ class DatabaseService {
         .collection('followers')
         .doc(currentUserId);
 
-    batch.set(
-      followingRef,
-      {
-        'userId': targetUserId,
-        'followedAt':
-            FieldValue.serverTimestamp(),
-      },
-    );
+    batch.set(followingRef, {
+      'userId': targetUserId,
+      'followedAt': FieldValue.serverTimestamp(),
+    });
 
-    batch.set(
-      followerRef,
-      {
-        'userId': currentUserId,
-        'followedAt':
-            FieldValue.serverTimestamp(),
-      },
-    );
+    batch.set(followerRef, {
+      'userId': currentUserId,
+      'followedAt': FieldValue.serverTimestamp(),
+    });
 
     await batch.commit();
   }
@@ -215,8 +180,7 @@ class DatabaseService {
     await batch.commit();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>>
-      getFollowing(
+  Stream<QuerySnapshot<Map<String, dynamic>>> getFollowing(
     String userId,
   ) {
     return _db
@@ -226,8 +190,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>>
-      getFollowers(
+  Stream<QuerySnapshot<Map<String, dynamic>>> getFollowers(
     String userId,
   ) {
     return _db
@@ -237,8 +200,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>>
-      getFollowStatus({
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getFollowStatus({
     required String currentUserId,
     required String targetUserId,
   }) {
@@ -250,9 +212,49 @@ class DatabaseService {
         .snapshots();
   }
 
-  // =========================================================
-  // POSTS
-  // =========================================================
+  // Find people followed by accounts that you follow.
+  // More shared connections means a higher suggestion score.
+
+  Future<Map<String, int>> getSuggestedUserScores(
+    String uid,
+  ) async {
+    final following = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('following')
+        .limit(40)
+        .get();
+
+    // Exclude yourself and people you already follow.
+    final excluded = <String>{
+      uid,
+      ...following.docs.map((doc) => doc.id),
+    };
+
+    final scores = <String, int>{};
+
+    // Check the people each followed user follows.
+    for (final friend in following.docs) {
+      final theirFollowing = await _db
+          .collection('users')
+          .doc(friend.id)
+          .collection('following')
+          .limit(100)
+          .get();
+
+      for (final other in theirFollowing.docs) {
+        if (!excluded.contains(other.id)) {
+          scores.update(
+            other.id,
+            (score) => score + 1,
+            ifAbsent: () => 1,
+          );
+        }
+      }
+    }
+
+    return scores;
+  }
 
   Future<void> addPost({
     required String userId,
@@ -267,47 +269,103 @@ class DatabaseService {
       'title': title,
       'description': description,
       'imageUrl': imageUrl,
-      'createdAt':
-          FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>>
-      getPosts() {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getPosts() {
     return _db
         .collection('posts')
-        .orderBy(
-          'createdAt',
-          descending: true,
-        )
+        .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>>
-      getPostsByUser(
+  Stream<QuerySnapshot<Map<String, dynamic>>> getPostsByUser(
     String userId,
   ) {
     return _db
         .collection('posts')
-        .where(
-          'userId',
-          isEqualTo: userId,
-        )
+        .where('userId', isEqualTo: userId)
         .snapshots();
+  }
+
+  // Get a specific post using its document ID.
+  // This is also used to display bookmarked posts.
+
+  Future<DocumentSnapshot<Map<String, dynamic>>> getPost(
+    String postId,
+  ) async {
+    return await _db
+        .collection('posts')
+        .doc(postId)
+        .get();
+  }
+
+
+  // A user can edit only their own post.
+  // This updates the text without changing the image.
+
+  Future<void> editPost({
+    required String postId,
+    required String title,
+    required String description,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) {
+      throw StateError('You must be logged in.');
+    }
+
+    final postRef = _db.collection('posts').doc(postId);
+    final post = await postRef.get();
+
+    if (!post.exists || post.data()?['userId'] != uid) {
+      throw StateError(
+        'You can only edit your own posts.',
+      );
+    }
+
+    final newTitle = title.trim();
+    final newDescription = description.trim();
+
+    if (newTitle.isEmpty ||
+        newTitle.length > 100 ||
+        newDescription.isEmpty ||
+        newDescription.length > 1000) {
+      throw ArgumentError(
+        'Title must be 1-100 characters and '
+        'description must be 1-1000 characters.',
+      );
+    }
+
+    await postRef.update({
+      'title': newTitle,
+      'description': newDescription,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> deletePost(
     String postId,
   ) async {
-    await _db
-        .collection('posts')
-        .doc(postId)
-        .delete();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) {
+      throw StateError('You must be logged in.');
+    }
+
+    final postRef = _db.collection('posts').doc(postId);
+    final post = await postRef.get();
+
+    if (!post.exists || post.data()?['userId'] != uid) {
+      throw StateError(
+        'You can only delete your own posts.',
+      );
+    }
+
+    await postRef.delete();
   }
 
-  // =========================================================
-  // COMMENTS
-  // =========================================================
 
   Future<void> addComment({
     required String postId,
@@ -315,6 +373,22 @@ class DatabaseService {
     required String userEmail,
     required String comment,
   }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null || uid != userId) {
+      throw StateError(
+        'You must be logged in to comment.',
+      );
+    }
+
+    final newComment = comment.trim();
+
+    if (newComment.isEmpty || newComment.length > 500) {
+      throw ArgumentError(
+        'Comment must be 1-500 characters.',
+      );
+    }
+
     await _db
         .collection('posts')
         .doc(postId)
@@ -322,14 +396,12 @@ class DatabaseService {
         .add({
       'userId': userId,
       'userEmail': userEmail,
-      'comment': comment,
-      'createdAt':
-          FieldValue.serverTimestamp(),
+      'comment': newComment,
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>>
-      getComments(
+  Stream<QuerySnapshot<Map<String, dynamic>>> getComments(
     String postId,
   ) {
     return _db
@@ -340,9 +412,75 @@ class DatabaseService {
         .snapshots();
   }
 
-  // =========================================================
-  // LIKES
-  // =========================================================
+  Future<void> editComment({
+    required String postId,
+    required String commentId,
+    required String comment,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) {
+      throw StateError('You must be logged in.');
+    }
+
+    final commentRef = _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId);
+
+    final existingComment = await commentRef.get();
+
+    if (!existingComment.exists ||
+        existingComment.data()?['userId'] != uid) {
+      throw StateError(
+        'You can only edit your own comments.',
+      );
+    }
+
+    final updatedComment = comment.trim();
+
+    if (updatedComment.isEmpty ||
+        updatedComment.length > 500) {
+      throw ArgumentError(
+        'Comment must be 1-500 characters.',
+      );
+    }
+
+    await commentRef.update({
+      'comment': updatedComment,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+
+  Future<void> deleteComment({
+    required String postId,
+    required String commentId,
+  }) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) {
+      throw StateError('You must be logged in.');
+    }
+
+    final commentRef = _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId);
+
+    final existingComment = await commentRef.get();
+
+    if (!existingComment.exists ||
+        existingComment.data()?['userId'] != uid) {
+      throw StateError(
+        'You can only delete your own comments.',
+      );
+    }
+
+    await commentRef.delete();
+  }
 
   Future<void> likePost({
     required String postId,
@@ -355,8 +493,7 @@ class DatabaseService {
         .doc(userId)
         .set({
       'userId': userId,
-      'createdAt':
-          FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
@@ -372,8 +509,7 @@ class DatabaseService {
         .delete();
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>>
-      getLikeStatus({
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getLikeStatus({
     required String postId,
     required String userId,
   }) {
@@ -385,8 +521,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>>
-      getLikes(
+  Stream<QuerySnapshot<Map<String, dynamic>>> getLikes(
     String postId,
   ) {
     return _db
@@ -396,9 +531,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  // =========================================================
-  // SAVED POSTS
-  // =========================================================
+  // Save a post to the signed-in user's collection.
 
   Future<void> savePost({
     required String userId,
@@ -411,10 +544,11 @@ class DatabaseService {
         .doc(postId)
         .set({
       'postId': postId,
-      'savedAt':
-          FieldValue.serverTimestamp(),
+      'savedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  // Remove a saved post.
 
   Future<void> unsavePost({
     required String userId,
@@ -428,8 +562,9 @@ class DatabaseService {
         .delete();
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>>
-      getSaveStatus({
+  // Check whether a post is already saved.
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getSaveStatus({
     required String userId,
     required String postId,
   }) {
@@ -441,11 +576,23 @@ class DatabaseService {
         .snapshots();
   }
 
-  // =========================================================
-  // MY PLANTS
-  // =========================================================
+  // Load all saved posts for the user's profile,
+  // starting with the most recently saved.
 
-  // Doc id is the Perenual species id, so a species can't be added twice.
+  Stream<QuerySnapshot<Map<String, dynamic>>> getSavedPosts(
+    String userId,
+  ) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('savedPosts')
+        .orderBy('savedAt', descending: true)
+        .snapshots();
+  }
+
+  // Doc ID is the Perenual species ID,
+  // so a species cannot be added twice.
+
   Future<void> addMyPlant({
     required String userId,
     required MyPlant plant,
@@ -470,7 +617,8 @@ class DatabaseService {
         .delete();
   }
 
-  /// Records a watering. [at] defaults to now; pass the previous value to undo.
+  // Record when the plant was last watered.
+
   Future<void> setLastWatered({
     required String userId,
     required int perenualId,
@@ -482,11 +630,15 @@ class DatabaseService {
         .collection('myPlants')
         .doc('$perenualId')
         .update({
-      'lastWateredAt': at == null ? Timestamp.now() : Timestamp.fromDate(at),
+      'lastWateredAt': at == null
+          ? Timestamp.now()
+          : Timestamp.fromDate(at),
     });
   }
 
-  /// Sets how often to water, or clears the schedule with null.
+  // Set how often the plant should be watered.
+  // Null clears the watering schedule.
+
   Future<void> setWaterEveryDays({
     required String userId,
     required int perenualId,
@@ -497,8 +649,12 @@ class DatabaseService {
         .doc(userId)
         .collection('myPlants')
         .doc('$perenualId')
-        .update({'waterEveryDays': days});
+        .update({
+      'waterEveryDays': days,
+    });
   }
+
+  // Stream all plants belonging to the user.
 
   Stream<List<MyPlant>> getMyPlants(
     String userId,
@@ -507,17 +663,20 @@ class DatabaseService {
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .orderBy(
-          'addedAt',
-          descending: true,
-        )
+        .orderBy('addedAt', descending: true)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => MyPlant.fromFirestore(doc.data()))
+              .map(
+                (doc) => MyPlant.fromFirestore(
+                  doc.data(),
+                ),
+              )
               .toList(),
         );
   }
+
+  // Check whether a plant is already in My Plants.
 
   Stream<bool> isInMyPlants({
     required String userId,
