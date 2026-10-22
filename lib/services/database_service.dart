@@ -454,33 +454,33 @@ class DatabaseService {
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('${plant.perenualId}')
+        .doc(plant.id)
         .set(plant.toFirestore());
   }
 
   Future<void> removeMyPlant({
     required String userId,
-    required int perenualId,
+    required String plantId,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('$perenualId')
+        .doc(plantId)
         .delete();
   }
 
   /// Records a watering. [at] defaults to now; pass the previous value to undo.
   Future<void> setLastWatered({
     required String userId,
-    required int perenualId,
+    required String plantId,
     DateTime? at,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('$perenualId')
+        .doc(plantId)
         .update({
       'lastWateredAt': at == null ? Timestamp.now() : Timestamp.fromDate(at),
     });
@@ -489,14 +489,14 @@ class DatabaseService {
   /// Sets how often to water, or clears the schedule with null.
   Future<void> setWaterEveryDays({
     required String userId,
-    required int perenualId,
+    required String plantId,
     required int? days,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('$perenualId')
+        .doc(plantId)
         .update({'waterEveryDays': days});
   }
 
@@ -514,7 +514,12 @@ class DatabaseService {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => MyPlant.fromFirestore(doc.data()))
+              .map(
+                (doc) => MyPlant.fromFirestore({
+                  ...doc.data(),
+                  'id': doc.id,
+                }),
+          )
               .toList(),
         );
   }
@@ -531,6 +536,50 @@ class DatabaseService {
         .snapshots()
         .map((doc) => doc.exists);
   }
+
+  Future<void> addPlantAnalysis({
+    required String userId,
+    required String plantId,
+    required String scientificName,
+    String? commonName,
+    double? confidence,
+    required String healthStatus,
+    required List<Map<String, dynamic>> issues,
+    required List<String> recommendedCare,
+    String? imageUrl,
+    }) async {
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('myPlants')
+          .doc(plantId)
+          .collection('analyses')
+          .add({
+        'scientificName': scientificName,
+        'commonName': commonName,
+        'confidence': confidence,
+        'healthStatus': healthStatus,
+        'issues': issues,
+        'recommendedCare': recommendedCare,
+        'imageUrl': imageUrl,
+        'analyzedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+
+    Stream<QuerySnapshot<Map<String, dynamic>>> getPlantAnalyses({
+      required String userId,
+      required String plantId,
+    }) {
+      return _db
+          .collection('users')
+          .doc(userId)
+          .collection('myPlants')
+          .doc(plantId)
+          .collection('analyses')
+          .orderBy('analyzedAt', descending: true)
+          .snapshots();
+    }
 // =========================================================
   // SAVED PLANTS (MY PLANTS)
   // =========================================================

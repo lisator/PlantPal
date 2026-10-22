@@ -6,8 +6,24 @@ import '../widgets/watering.dart';
 import 'home_screen.dart';
 import 'plant_details_screen.dart';
 
+import 'analysis_plant_details_screen.dart';
+
 void openMyPlantDetails(BuildContext context, MyPlant plant) {
-  openPlantDetailsPage(context, plant.toSearchResult());
+  if (plant.perenualId != null) {
+    openPlantDetailsPage(
+      context,
+      plant.toSearchResult(),
+    );
+    return;
+  }
+
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) => AnalysisPlantDetailsScreen(
+        plant: plant,
+      ),
+    ),
+  );
 }
 
 class MyPlantsScreen extends StatefulWidget {
@@ -45,7 +61,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
     try {
       await DatabaseService().removeMyPlant(
         userId: userId,
-        perenualId: plant.perenualId,
+        plantId: plant.id,
       );
     } catch (e) {
       debugPrint('My Plants error: $e');

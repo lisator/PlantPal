@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
-import '../screens/profile_screen.dart';
+//import '../screens/profile_screen.dart';
 import '../screens/login_screen.dart';
 
 class AppDrawer extends StatelessWidget {

@@ -5,6 +5,11 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/plant_api_service.dart';
 
+import '../models/my_plant.dart';
+import '../services/cloudinary_service.dart';
+import '../services/database_service.dart';
+import 'home_screen.dart';
+
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
 
@@ -14,8 +19,13 @@ class UploadScreen extends StatefulWidget {
 
 class _UploadScreenState extends State<UploadScreen> {
   Uint8List? _imageBytes;
-  String? _fileName;
+
+  XFile? _selectedImage;
+
+  //String? _fileName;
   bool _isAnalyzing = false;
+
+  bool _isSaving = false;
 
   String? _scientificName;
   String? _commonName;
@@ -41,7 +51,10 @@ class _UploadScreenState extends State<UploadScreen> {
 
     setState(() {
       _imageBytes = bytes;
-      _fileName = image.name;
+      _selectedImage = image;
+     // _fileName = image.name;
+
+    
 
       _scientificName = null;
       _commonName = null;
@@ -197,6 +210,309 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  void _resetAnalysis() {
+  setState(() {
+    _imageBytes = null;
+    _selectedImage = null;
+    //_fileName = null;
+
+    _scientificName = null;
+    _commonName = null;
+    _confidence = null;
+    _healthStatus = null;
+    _errorMessage = null;
+
+    _healthIssues = [];
+    _recommendedCare = [];
+  });
+}
+
+Future<void> _createNewPlant() async {
+  final userId = currentUserId();
+
+  if (userId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please sign in to save plants.'),
+      ),
+    );
+    return;
+  }
+
+  if (_scientificName == null ||
+      _healthStatus == null ||
+      _selectedImage == null) {
+    return;
+  }
+
+  final nicknameController = TextEditingController();
+  final locationController = TextEditingController();
+
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Create New Plant'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nicknameController,
+            decoration: const InputDecoration(
+              labelText: 'Nickname (optional)',
+              hintText: 'e.g. Monty',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: locationController,
+            decoration: const InputDecoration(
+              labelText: 'Location (optional)',
+              hintText: 'e.g. Living room',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+
+  if (result != true || !mounted) {
+    nicknameController.dispose();
+    locationController.dispose();
+    return;
+  }
+
+  setState(() {
+    _isSaving = true;
+  });
+
+  try {
+    final imageUrl =
+        await CloudinaryService().uploadImage(_selectedImage!);
+
+    final plantId =
+        'analysis_${DateTime.now().millisecondsSinceEpoch}';
+
+    final plant = MyPlant.fromAnalysis(
+      id: plantId,
+      commonName: _commonName ?? _scientificName!,
+      scientificName: _scientificName!,
+      imageUrl: imageUrl,
+      nickname: nicknameController.text,
+      location: locationController.text,
+    );
+
+    await DatabaseService().addMyPlant(
+      userId: userId,
+      plant: plant,
+    );
+
+    await DatabaseService().addPlantAnalysis(
+      userId: userId,
+      plantId: plantId,
+      scientificName: _scientificName!,
+      commonName: _commonName,
+      confidence: _confidence,
+      healthStatus: _healthStatus!,
+      issues: _healthIssues,
+      recommendedCare: _recommendedCare,
+      imageUrl: imageUrl,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${plant.displayName} was added to My Plants.',
+        ),
+      ),
+    );
+
+    _resetAnalysis();
+  } catch (e) {
+    debugPrint('Save plant error: $e');
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save plant. Try again.'),
+        ),
+      );
+    }
+  } finally {
+    nicknameController.dispose();
+    locationController.dispose();
+
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+}
+
+Future<void> _saveToExistingPlant() async {
+  final userId = currentUserId();
+
+  if (userId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please sign in to save analyses.'),
+      ),
+    );
+    return;
+  }
+
+  if (_scientificName == null ||
+      _healthStatus == null ||
+      _selectedImage == null) {
+    return;
+  }
+
+  try {
+    final plants =
+        await DatabaseService().getMyPlants(userId).first;
+
+    if (!mounted) return;
+
+    if (plants.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You do not have any saved plants yet.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final selectedPlant = await showDialog<MyPlant>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save to Existing Plant'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: plants.length,
+            separatorBuilder: (context, index) =>
+                const Divider(),
+            itemBuilder: (context, index) {
+              final plant = plants[index];
+
+              return ListTile(
+                leading: plant.imageUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          plant.imageUrl!,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) =>
+                                  const Icon(
+                            Icons.local_florist,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.local_florist,
+                      ),
+                title: Text(
+                  plant.displayName,
+                ),
+                subtitle: Text(
+                  plant.scientificName,
+                ),
+                onTap: () {
+                  Navigator.pop(
+                    context,
+                    plant,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedPlant == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    final imageUrl =
+        await CloudinaryService().uploadImage(
+      _selectedImage!,
+    );
+
+    await DatabaseService().addPlantAnalysis(
+      userId: userId,
+      plantId: selectedPlant.id,
+      scientificName: _scientificName!,
+      commonName: _commonName,
+      confidence: _confidence,
+      healthStatus: _healthStatus!,
+      issues: _healthIssues,
+      recommendedCare: _recommendedCare,
+      imageUrl: imageUrl,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Analysis saved to ${selectedPlant.displayName}.',
+        ),
+      ),
+    );
+
+    _resetAnalysis();
+  } catch (e) {
+    debugPrint(
+      'Save existing plant analysis error: $e',
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not save analysis. Try again.',
+          ),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+}
   @override
   Widget build(BuildContext context) {
     final bool hasResults = _scientificName != null;
@@ -713,19 +1029,9 @@ class _UploadScreenState extends State<UploadScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                // Temporary placeholder.
-                // We'll connect this to My Plants next.
-
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Create New Plant will be connected to My Plants.',
-                    ),
-                  ),
-                );
-              },
+              onPressed: _isSaving
+                  ? null
+                  : _createNewPlant,
               icon: const Icon(
                 Icons.add_circle_outline,
               ),
@@ -733,16 +1039,13 @@ class _UploadScreenState extends State<UploadScreen> {
                 'Create New Plant',
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    const Color(0xFF315D3A),
+                backgroundColor: const Color(0xFF315D3A),
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   vertical: 15,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
@@ -757,20 +1060,10 @@ class _UploadScreenState extends State<UploadScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {
-                // Temporary placeholder.
-                // We'll connect this to the user's
-                // existing plants next.
+              onPressed: _isSaving
+                ? null
+                : _saveToExistingPlant,
 
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Save to Existing Plant will be connected to My Plants.',
-                    ),
-                  ),
-                );
-              },
               icon: const Icon(
                 Icons.bookmark_add_outlined,
               ),
@@ -801,21 +1094,7 @@ class _UploadScreenState extends State<UploadScreen> {
               // DISCARD
               Expanded(
                 child: TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _imageBytes = null;
-                      _fileName = null;
-
-                      _scientificName = null;
-                      _commonName = null;
-                      _confidence = null;
-                      _healthStatus = null;
-                      _errorMessage = null;
-
-                      _healthIssues = [];
-                      _recommendedCare = [];
-                    });
-                  },
+                  onPressed: _resetAnalysis,
                   icon: const Icon(
                     Icons.delete_outline,
                   ),
@@ -838,21 +1117,7 @@ class _UploadScreenState extends State<UploadScreen> {
               // ANALYZE ANOTHER
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _imageBytes = null;
-                      _fileName = null;
-
-                      _scientificName = null;
-                      _commonName = null;
-                      _confidence = null;
-                      _healthStatus = null;
-                      _errorMessage = null;
-
-                      _healthIssues = [];
-                      _recommendedCare = [];
-                    });
-                  },
+                  onPressed: _resetAnalysis,
                   icon: const Icon(
                     Icons.refresh,
                   ),

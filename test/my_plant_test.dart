@@ -23,7 +23,7 @@ void main() {
 
     MyPlant plant({int? every, DateTime? lastWatered, DateTime? added}) =>
         MyPlant(
-          perenualId: 1,
+          id: '1',
           commonName: 'Monstera',
           scientificName: 'Monstera deliciosa',
           waterEveryDays: every,
