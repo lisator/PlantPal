@@ -1,9 +1,11 @@
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
 import '../services/reply_service.dart';
+
 import 'add_post_screen.dart';
 import 'find_users_screen.dart';
 import 'user_profile_screen.dart';
@@ -68,18 +70,21 @@ class _CommunityScreenState extends State<CommunityScreen> {
     String existing = '',
     int maximum = 500,
   }) async {
-    final controller = TextEditingController(text: existing);
+    String input = existing;
 
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(title),
-        content: TextField(
-          controller: controller,
+        content: TextFormField(
+          initialValue: existing,
           autofocus: true,
           minLines: 2,
           maxLines: 5,
           maxLength: maximum,
+          onChanged: (value) {
+            input = value;
+          },
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
           ),
@@ -95,7 +100,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             onPressed: () {
               Navigator.pop(
                 dialogContext,
-                controller.text.trim(),
+                input.trim(),
               );
             },
             child: const Text('Save'),
@@ -103,8 +108,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
         ],
       ),
     );
-
-    controller.dispose();
 
     if (result == null ||
         result.isEmpty ||
@@ -473,7 +476,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       : 'View ${docs.length} ${docs.length == 1 ? 'reply' : 'replies'}',
                 ),
               ),
-
               if (expanded)
                 ...docs.map((doc) {
                   final data = doc.data();
@@ -509,7 +511,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               ),
                               const SizedBox(height: 3),
                               Text(text),
-
                               if (data['updatedAt'] != null)
                                 const Text(
                                   'Edited',
@@ -521,7 +522,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             ],
                           ),
                         ),
-
                         if (mine)
                           PopupMenuButton<String>(
                             tooltip: 'Reply options',
@@ -608,7 +608,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     : 'View all ${docs.length} comments',
               ),
             ),
-
             if (expanded)
               ...docs.map((doc) {
                 final data = doc.data();
@@ -642,11 +641,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   .toString(),
                               small: true,
                             ),
-
                             const SizedBox(height: 5),
-
                             Text(text),
-
                             if (data['updatedAt'] != null)
                               const Text(
                                 'Edited',
@@ -655,19 +651,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   color: Colors.grey,
                                 ),
                               ),
-
                             TextButton(
                               onPressed: () {
                                 _addReply(postId, doc.id);
                               },
                               child: const Text('Reply'),
                             ),
-
                             _replyList(postId, doc.id),
                           ],
                         ),
                       ),
-
                       if (mine)
                         PopupMenuButton<String>(
                           tooltip: 'Comment options',
@@ -714,6 +707,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   // On phones, images fit the available width.
   // On computers, images stop growing at 550 pixels.
   // BoxFit.contain keeps the full picture visible.
+
   Widget _postImage(String imageUrl) {
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -825,7 +819,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     (data['userEmail'] ?? '').toString(),
                   ),
                 ),
-
                 if (mine)
                   PopupMenuButton<String>(
                     tooltip: 'Post options',
@@ -851,7 +844,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ),
               ],
             ),
-
             const SizedBox(height: 12),
 
             // Post title.
@@ -859,7 +851,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
               (data['title'] ?? '').toString(),
               style: Theme.of(context).textTheme.titleMedium,
             ),
-
             const SizedBox(height: 6),
 
             // Post description.
@@ -900,7 +891,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     );
                   },
                 ),
-
                 StreamBuilder<
                     QuerySnapshot<Map<String, dynamic>>>(
                   stream: _db.getLikes(doc.id),
@@ -910,7 +900,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     );
                   },
                 ),
-
                 IconButton(
                   tooltip: 'Add comment',
                   onPressed: () {
@@ -920,9 +909,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     Icons.mode_comment_outlined,
                   ),
                 ),
-
                 const Spacer(),
-
                 StreamBuilder<
                     DocumentSnapshot<Map<String, dynamic>>>(
                   stream: _db.getSaveStatus(
@@ -1010,9 +997,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         label: const Text('Find People'),
                       ),
                     ),
-
                     const SizedBox(width: 8),
-
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: () {
