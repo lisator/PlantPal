@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/perenual_models.dart';
+import 'wikipedia_service.dart' show speciesTitle;
 
 /// Thrown when a Perenual request fails. [message] is safe to show to users.
 class PerenualException implements Exception {
@@ -34,9 +35,13 @@ class PerenualService {
 
   static const String _keyOverride = String.fromEnvironment('PERENUAL_API_KEY');
   static const String _baseUrl = 'https://perenual.com/api/v2';
-  static const Duration _timeout = Duration(seconds: 15);
   static const Duration _cacheDuration = Duration(days: 7);
   static const String _cachePrefix = 'perenual_cache:';
+
+  /// Requests allowed per day on the free plan.
+  static const int _dailyLimit = 100;
+  static const String _countDateKey = 'perenual_requests_date';
+  static const String _countKey = 'perenual_requests_count';
 
   final Map<String, PlantSearchPage> _searchCache = {};
   final Map<int, PlantDetails> _detailsCache = {};
@@ -68,9 +73,16 @@ class PerenualService {
     );
   }
 
-  Future<PlantSearchPage> searchPlants(String query, {int page = 1}) async {
+  /// The search tab only shows indoor plants ([indoorOnly]), since PlantPal
+  /// is for houseplants. Plants identified by plant analysis can be any
+  /// plant (e.g. a rose), so [findByName] searches everything.
+  Future<PlantSearchPage> searchPlants(
+    String query, {
+    int page = 1,
+    bool indoorOnly = true,
+  }) async {
     final normalized = query.trim().toLowerCase();
-    final cacheKey = '$normalized|$page';
+    final cacheKey = '$normalized|$page|$indoorOnly';
     final cached = _searchCache[cacheKey];
     if (cached != null) return cached;
 
@@ -78,6 +90,7 @@ class PerenualService {
       queryParameters: {
         'q': normalized,
         'page': '$page',
+        if (indoorOnly) 'indoor': '1',
       },
     ));
 
@@ -86,26 +99,60 @@ class PerenualService {
     return result;
   }
 
+  /// Perenual's details for a plant known only by name, e.g. one identified
+  /// by plant analysis: searches for its species and picks the result whose
+  /// scientific name matches best. Returns null if Perenual doesn't have it.
+  /// For species outside the free plan, only the basic details are returned.
+  Future<PlantDetails?> findByName({
+    required String scientificName,
+    required String commonName,
+  }) async {
+    final species = speciesTitle(scientificName);
+    final query = species.isNotEmpty ? species : commonName.trim();
+    if (query.isEmpty) return null;
+
+    final results =
+        (await searchPlants(query, indoorOnly: false)).results;
+    if (results.isEmpty) return null;
+
+    final wanted = species.toLowerCase();
+    final match = results.firstWhere(
+      (r) => r.scientificName.toLowerCase().startsWith(wanted),
+      orElse: () => results.first,
+    );
+    return match.hasFullDetails
+        ? getPlantDetails(match.id)
+        : PlantDetails.basic(match);
+  }
+
   Future<PlantDetails> getPlantDetails(int id) async {
     final cached = _detailsCache[id];
     if (cached != null) return cached;
 
+    // Each Perenual request can take 15+ seconds, so the care guide is
+    // requested at the same time as the details instead of after them.
+    final careGuide = _getCareGuide(id);
     final json = await _getCached(Uri.parse('$_baseUrl/species/details/$id'));
-
-    var details = PlantDetails.fromJson(json);
-
-    // The care guide is a nice-to-have; if it fails, still show the details.
-    final guideUrl = details.careGuideUrl;
-    if (guideUrl != null) {
-      try {
-        final guideUri = Uri.parse(guideUrl.replaceFirst('http://', 'https://'));
-        final guideJson = await _getCached(guideUri);
-        details = details.copyWith(careGuide: parseCareGuide(guideJson));
-      } catch (_) {}
-    }
+    final details =
+        PlantDetails.fromJson(json).copyWith(careGuide: await careGuide);
 
     _detailsCache[id] = details;
     return details;
+  }
+
+  /// Perenual's written care guide (watering, sunlight, pruning). It's a
+  /// nice-to-have, so if it fails the details still show without it.
+  Future<Map<String, String>> _getCareGuide(int id) async {
+    try {
+      final json = await _getCached(Uri.parse(
+        'https://perenual.com/api/species-care-guide-list'
+        '?species_id=$id&page=1',
+      ));
+      return parseCareGuide(json);
+    } catch (e) {
+      debugPrint('Perenual care guide for $id failed: $e');
+      return const {};
+    }
   }
 
   /// Returns a saved response for [uri] if one is fresh, otherwise fetches it
@@ -140,18 +187,45 @@ class PerenualService {
     return body;
   }
 
+  /// Logs each real (not cached) request with how many this device has sent
+  /// today, e.g. "Perenual request 12/100 today (88 left per Perenual):
+  /// /api/v2/species-list?q=fern&page=1".
+  ///
+  /// The device keeps its own count because Perenual's remaining-quota
+  /// header can't be read in the web build (browsers hide it). When the
+  /// header is readable, it's shown too. The count is per device, while the
+  /// limit is shared by everyone using the same API key.
+  Future<void> _logRequest(Uri uri, http.Response response) async {
+    var count = 1;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      if (prefs.getString(_countDateKey) == today) {
+        count = (prefs.getInt(_countKey) ?? 0) + 1;
+      }
+      await prefs.setString(_countDateKey, today);
+      await prefs.setInt(_countKey, count);
+    } catch (_) {
+      // Counting is only for the log; never let it break a request.
+    }
+
+    final remaining = response.headers['x-ratelimit-remaining'];
+    debugPrint(
+      'Perenual request $count/$_dailyLimit today'
+      '${remaining == null ? '' : ' ($remaining left per Perenual)'}'
+      ': ${uri.path}?${uri.query} -> HTTP ${response.statusCode}',
+    );
+  }
+
   Future<Map<String, dynamic>> _get(Uri uri) async {
-    debugPrint('Perenual request: ${uri.path}?${uri.query}');
     final key = await _getApiKey();
 
     final http.Response response;
     try {
-      response = await http
-          .get(uri.replace(queryParameters: {...uri.queryParameters, 'key': key}))
-          .timeout(_timeout);
-    } on TimeoutException {
-      throw const PerenualException(
-        'The plant database took too long to respond. Please try again.',
+      // No time limit: Perenual's server often takes 15-20 seconds to
+      // answer, and a slow answer is better than an error.
+      response = await http.get(
+        uri.replace(queryParameters: {...uri.queryParameters, 'key': key}),
       );
     } catch (_) {
       throw const PerenualException(
@@ -159,11 +233,7 @@ class PerenualService {
       );
     }
 
-    debugPrint(
-      'Perenual requests left today: '
-      '${response.headers['x-ratelimit-remaining'] ?? 'unknown'}'
-      '/${response.headers['x-ratelimit-limit'] ?? '100'}',
-    );
+    await _logRequest(uri, response);
 
     if (response.statusCode == 429) {
       // Perenual also uses 429 for species outside the free plan.

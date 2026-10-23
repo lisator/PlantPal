@@ -1,19 +1,23 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:plantpal/main.dart';
+import 'package:plantpal/screens/home_screen.dart';
 
 void main() {
-  testWidgets('PlantPal app loads', (WidgetTester tester) async {
-    await tester.pumpWidget(const PlantPalApp());
+  // Tests can't reach Firebase, so run the app the way it runs on Linux
+  // desktop: no Firebase, straight to the home screen.
+  testWidgets('PlantPal app loads the home screen without Firebase',
+      (WidgetTester tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    try {
+      await tester.pumpWidget(const PlantPalApp());
+      await tester.pump();
 
-    expect(find.text('PlantPal'), findsOneWidget);
-    expect(find.text('PlantPal home page'), findsOneWidget);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.text('PlantPal'), findsWidgets);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

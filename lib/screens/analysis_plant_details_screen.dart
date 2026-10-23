@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/my_plant.dart';
+import '../models/perenual_models.dart';
 import '../services/database_service.dart';
+import '../services/perenual_service.dart';
+import '../widgets/plant_care_guide.dart';
 import 'home_screen.dart';
 
 class AnalysisPlantDetailsScreen extends StatelessWidget {
@@ -33,6 +36,10 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               _PlantInformation(plant: plant),
+
+              const SizedBox(height: 28),
+
+              _AnalysisCareGuide(plant: plant),
 
               const SizedBox(height: 28),
 
@@ -226,6 +233,91 @@ class _PlantInformation extends StatelessWidget {
             value: _formatDate(plant.addedAt!),
           ),
       ],
+    );
+  }
+}
+
+/// Care info for a plant identified by plant analysis. These plants have no
+/// Perenual ID, so Perenual is searched by the identified name first, then
+/// Wikipedia fills in whatever Perenual doesn't have.
+class _AnalysisCareGuide extends StatefulWidget {
+  const _AnalysisCareGuide({required this.plant});
+
+  final MyPlant plant;
+
+  @override
+  State<_AnalysisCareGuide> createState() => _AnalysisCareGuideState();
+}
+
+class _AnalysisCareGuideState extends State<_AnalysisCareGuide> {
+  late final Future<PlantDetails?> _perenual;
+  late final Future<WikipediaExtras> _wikipedia;
+
+  @override
+  void initState() {
+    super.initState();
+    // Both start now, side by side: Perenual by the identified name, and
+    // Wikipedia for whatever Perenual turns out not to have.
+    _perenual = PerenualService.instance
+        .findByName(
+          scientificName: widget.plant.scientificName,
+          commonName: widget.plant.commonName,
+        )
+        .catchError((Object e) {
+      debugPrint('Perenual lookup for analysis plant failed: $e');
+      return null;
+    });
+    _wikipedia = loadWikipediaFor(
+      scientificName: widget.plant.scientificName,
+      commonName: widget.plant.commonName,
+    );
+  }
+
+  /// Names only, for plants Perenual doesn't have, so Wikipedia can still
+  /// be searched.
+  PlantDetails get _namesOnly => PlantDetails.basic(PlantSearchResult(
+        id: -1,
+        commonName: widget.plant.commonName,
+        scientificName: widget.plant.scientificName,
+      ));
+
+
+  /// Where the care info comes from, when it isn't simply this plant's
+  /// Perenual entry.
+  String? _note(PlantDetails? found) {
+    if (found == null) {
+      return 'This plant isn\'t in our plant database (Perenual), so care '
+          'info comes from Wikipedia.';
+    }
+    final identified = widget.plant.scientificName.toLowerCase();
+    if (!found.scientificName.toLowerCase().startsWith(identified) &&
+        !identified.startsWith(found.scientificName.toLowerCase())) {
+      return 'Showing care info for ${found.commonName} '
+          '(${found.scientificName}), the closest match in our plant database.';
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PlantDetails?>(
+      future: _perenual,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        final found = snapshot.data;
+        return PlantCareGuide(
+          details: found ?? _namesOnly,
+          wikipedia: _wikipedia,
+          note: _note(found),
+        );
+      },
     );
   }
 }

@@ -116,6 +116,49 @@ Cultivars have light green variegation. It only needs watering when the soil is 
       expect(excerpts[CareTopic.water], contains('only needs watering'));
     });
 
+    test('skips sentences that only mention a keyword in passing', () {
+      final excerpts = extractCareExcerpts('''
+== Cultivation ==
+Most species were introduced from Japan in the 19th century, originating from shady locations with more moisture.
+It does best in climates characterised by wet winters and dry summers.
+Basil grows best if sown under glass in compost in a pot.
+Increasing light intensity can enhance the dry matter content.
+Once divided, each grouping must be planted in its own well-draining pot.
+''');
+
+      expect(excerpts, isEmpty);
+    });
+
+    test('prefers indoor advice over outdoor advice', () {
+      final excerpts = extractCareExcerpts('''
+== Cultivation ==
+When grown outdoors, it prefers part shade to full shade.
+When grown indoors, the plant prefers bright indirect light.
+''');
+
+      expect(excerpts[CareTopic.light], startsWith('When grown indoors'));
+    });
+
+    test('keeps excerpts short', () {
+      final excerpts = extractCareExcerpts('''
+== Cultivation ==
+It prefers bright indirect light, which is easiest to provide near an east-facing window where morning sun is gentle, although a south-facing window shaded by a sheer curtain also works for most growers.
+It needs bright, indirect light to keep its leaves variegated and avoid leggy growth.
+It tolerates low light conditions.
+''');
+
+      expect(excerpts[CareTopic.light]!.length, lessThan(260));
+    });
+
+    test('careSectionsText keeps only care sections', () {
+      final text = careSectionsText(article);
+
+      expect(text, contains('rich and loose soil'));
+      expect(text, contains('bright indirect light'));
+      expect(text, isNot(contains('humid tropical forests')));
+      expect(text, isNot(contains('mildly toxic')));
+    });
+
     test('returns nothing for an article without a care section', () {
       expect(
         extractCareExcerpts('A fern.\n\n== Description ==\nFerns grow in moist shade.'),
