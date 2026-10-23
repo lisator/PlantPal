@@ -31,10 +31,6 @@ class CareAiService {
     'gemini-3.1-flash-lite',
   ];
 
-  /// A busy model can take over a minute just to fail, so give up on it
-  /// sooner and move to the next one. A normal answer takes 1-10 seconds.
-  static const Duration _timeout = Duration(seconds: 15);
-
   /// Cut-off for unusually long care sections, to keep requests small.
   static const int _maxTextLength = 8000;
 
@@ -76,8 +72,9 @@ Rules:
 
     for (final name in modelNames) {
       try {
-        final response = await _model(name)
-            .generateContent([Content.text(text)]).timeout(_timeout);
+        // No time limit: a slow answer is better than no care info.
+        final response =
+            await _model(name).generateContent([Content.text(text)]);
         final json = jsonDecode(response.text ?? '');
         return json is Map ? verifiedExcerpts(json, text) : null;
       } catch (e) {
@@ -88,11 +85,10 @@ Rules:
     return null;
   }
 
-  /// Busy (5xx), slow (timeout) or retired (404) models are worth skipping
-  /// for the next one. Other errors, like a used-up free-tier limit or AI
-  /// Logic not being set up, would fail the same way on every model.
+  /// Busy (5xx) or retired (404) models are worth skipping for the next
+  /// one. Other errors, like a used-up free-tier limit or AI Logic not being
+  /// set up, would fail the same way on every model.
   static bool _tryNextModel(Object error) =>
-      error is TimeoutException ||
       error is ServerException ||
       RegExp(r'Server Error \[5|\b404\b|not found|no longer available')
           .hasMatch(error.toString());

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/perenual_models.dart';
 import '../services/perenual_service.dart';
 import 'plant_details_screen.dart';
+import '../widgets/plant_care_guide.dart';
 
 class PlantSearch extends StatefulWidget {
   const PlantSearch({super.key});

@@ -84,7 +84,6 @@ class WikipediaService {
 
   static const String _summaryUrl = 'https://en.wikipedia.org/api/rest_v1/page/summary';
   static const String _actionApiUrl = 'https://en.wikipedia.org/w/api.php';
-  static const Duration _timeout = Duration(seconds: 10);
   static const Duration _cacheDuration = Duration(days: 30);
   static const String _cachePrefix = 'wikipedia_cache:';
   // Change the name when the care prompt changes, so old picks are dropped.
@@ -272,9 +271,8 @@ class WikipediaService {
   /// Throws on network errors.
   Future<Map<String, dynamic>?> _fetchSummary(String title) async {
     final path = Uri.encodeComponent(title.replaceAll(' ', '_'));
-    final response = await http
-        .get(Uri.parse('$_summaryUrl/$path'), headers: _headers)
-        .timeout(_timeout);
+    final response =
+        await http.get(Uri.parse('$_summaryUrl/$path'), headers: _headers);
 
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
@@ -302,8 +300,7 @@ class WikipediaService {
             'origin': '*',
           }),
           headers: _headers,
-        )
-        .timeout(_timeout);
+        );
 
     if (response.statusCode != 200) {
       throw Exception('HTTP ${response.statusCode}');
@@ -574,7 +571,6 @@ final RegExp _soilMaterialPattern = RegExp(
 /// Reduces a scientific name to "Genus species" so cultivars and varieties
 /// ("Monstera deliciosa 'Thai Constellation'", "Ficus elastica var. ...")
 /// match the species article.
-@visibleForTesting
 String speciesTitle(String scientificName) {
   final words = scientificName
       .split(RegExp(r'\s+'))

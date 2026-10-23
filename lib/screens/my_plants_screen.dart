@@ -5,6 +5,7 @@ import '../services/database_service.dart';
 import '../widgets/watering.dart';
 import 'home_screen.dart';
 import 'plant_details_screen.dart';
+import '../widgets/plant_care_guide.dart';
 
 import 'analysis_plant_details_screen.dart';
 
