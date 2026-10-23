@@ -601,19 +601,19 @@ class DatabaseService {
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('${plant.perenualId}')
+        .doc(plant.id)
         .set(plant.toFirestore());
   }
 
   Future<void> removeMyPlant({
     required String userId,
-    required int perenualId,
+    required String plantId,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('$perenualId')
+        .doc(plantId)
         .delete();
   }
 
@@ -621,14 +621,14 @@ class DatabaseService {
 
   Future<void> setLastWatered({
     required String userId,
-    required int perenualId,
+    required String plantId,
     DateTime? at,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('$perenualId')
+        .doc(plantId)
         .update({
       'lastWateredAt': at == null
           ? Timestamp.now()
@@ -641,17 +641,15 @@ class DatabaseService {
 
   Future<void> setWaterEveryDays({
     required String userId,
-    required int perenualId,
+    required String plantId,
     required int? days,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
-        .doc('$perenualId')
-        .update({
-      'waterEveryDays': days,
-    });
+        .doc(plantId)
+        .update({'waterEveryDays': days});
   }
 
   // Stream all plants belonging to the user.
@@ -668,10 +666,11 @@ class DatabaseService {
         .map(
           (snapshot) => snapshot.docs
               .map(
-                (doc) => MyPlant.fromFirestore(
-                  doc.data(),
-                ),
-              )
+                (doc) => MyPlant.fromFirestore({
+                  ...doc.data(),
+                  'id': doc.id,
+                }),
+          )
               .toList(),
         );
   }
@@ -690,6 +689,50 @@ class DatabaseService {
         .snapshots()
         .map((doc) => doc.exists);
   }
+
+  Future<void> addPlantAnalysis({
+    required String userId,
+    required String plantId,
+    required String scientificName,
+    String? commonName,
+    double? confidence,
+    required String healthStatus,
+    required List<Map<String, dynamic>> issues,
+    required List<String> recommendedCare,
+    String? imageUrl,
+    }) async {
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('myPlants')
+          .doc(plantId)
+          .collection('analyses')
+          .add({
+        'scientificName': scientificName,
+        'commonName': commonName,
+        'confidence': confidence,
+        'healthStatus': healthStatus,
+        'issues': issues,
+        'recommendedCare': recommendedCare,
+        'imageUrl': imageUrl,
+        'analyzedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+
+    Stream<QuerySnapshot<Map<String, dynamic>>> getPlantAnalyses({
+      required String userId,
+      required String plantId,
+    }) {
+      return _db
+          .collection('users')
+          .doc(userId)
+          .collection('myPlants')
+          .doc(plantId)
+          .collection('analyses')
+          .orderBy('analyzedAt', descending: true)
+          .snapshots();
+    }
 // =========================================================
   // SAVED PLANTS (MY PLANTS)
   // =========================================================

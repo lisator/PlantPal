@@ -27,7 +27,7 @@ Future<void> markPlantWatered(
   try {
     await DatabaseService().setLastWatered(
       userId: userId,
-      perenualId: plant.perenualId,
+      plantId: plant.id,
     );
   } catch (e) {
     debugPrint('Watering error: $e');
@@ -48,7 +48,7 @@ Future<void> markPlantWatered(
               onPressed: () => DatabaseService()
                   .setLastWatered(
                     userId: userId,
-                    perenualId: plant.perenualId,
+                    plantId: plant.id,
                     at: previous,
                   )
                   .catchError((Object e) => debugPrint('Undo error: $e')),
@@ -80,7 +80,7 @@ Future<void> editWateringSchedule(
   try {
     await DatabaseService().setWaterEveryDays(
       userId: userId,
-      perenualId: plant.perenualId,
+      plantId: plant.id,
       days: result.days,
     );
   } catch (e) {
