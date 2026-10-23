@@ -19,11 +19,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
   final DatabaseService _db = DatabaseService();
   final ReplyService _replies = ReplyService();
 
-  // Keeps track of which comments and replies are open.
+  // Keeps track of opened comments and replies.
   final Set<String> _expandedComments = {};
   final Set<String> _expandedReplies = {};
 
-  // Show a message when something goes wrong.
+  // Show errors without crashing the screen.
   void _error(Object error) {
     if (!mounted) return;
 
@@ -34,7 +34,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // Ask before deleting something.
+  // Ask the user before deleting something.
   Future<bool> _confirm(String subject) async {
     return await showDialog<bool>(
           context: context,
@@ -62,7 +62,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         false;
   }
 
-  // Text box used for comments, replies, and editing.
+  // Text box for creating and editing comments or replies.
   Future<String?> _askForText({
     required String title,
     String existing = '',
@@ -145,7 +145,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Edit a comment that belongs to you.
+  // Edit a comment you created.
   Future<void> _editComment(
     String postId,
     String commentId,
@@ -169,7 +169,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Delete a comment that belongs to you.
+  // Delete a comment you created.
   Future<void> _deleteComment(
     String postId,
     String commentId,
@@ -186,7 +186,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Add a reply under a specific comment.
+  // Add a reply underneath a specific comment.
   Future<void> _addReply(
     String postId,
     String commentId,
@@ -204,7 +204,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
         reply: text,
       );
 
-      // Automatically show the reply after posting.
       if (mounted) {
         setState(() {
           _expandedReplies.add('$postId/$commentId');
@@ -215,7 +214,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Edit a reply that belongs to you.
+  // Edit one of your replies.
   Future<void> _editReply(
     String postId,
     String commentId,
@@ -241,7 +240,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Delete a reply that belongs to you.
+  // Delete one of your replies.
   Future<void> _deleteReply(
     String postId,
     String commentId,
@@ -260,7 +259,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Edit a post that belongs to you.
+  // Edit a post.
   Future<void> _editPost(
     String postId,
     Map<String, dynamic> data,
@@ -271,8 +270,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       maximum: 100,
     );
 
-    if (title == null) return;
-    if (!mounted) return;
+    if (title == null || !mounted) return;
 
     final description = await _askForText(
       title: 'Edit description',
@@ -293,7 +291,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Delete one of your posts.
+  // Delete a post.
   Future<void> _deletePost(String postId) async {
     if (!await _confirm('post')) return;
 
@@ -351,7 +349,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   // Display a user's username without the @ symbol.
-  // Tapping the username opens that user's profile.
+  // Tapping the username opens their profile.
   Widget _author(
     String uid,
     String fallback, {
@@ -425,7 +423,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // Show replies underneath one comment.
+  // Display replies under a comment.
   Widget _replyList(
     String postId,
     String commentId,
@@ -453,7 +451,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
         return Padding(
           padding: const EdgeInsets.only(
-            left: 27,
+            left: 20,
             top: 3,
           ),
           child: Column(
@@ -476,7 +474,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
               ),
 
-              // Only show replies when expanded.
               if (expanded)
                 ...docs.map((doc) {
                   final data = doc.data();
@@ -525,7 +522,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           ),
                         ),
 
-                        // Only the reply owner sees edit/delete.
                         if (mine)
                           PopupMenuButton<String>(
                             tooltip: 'Reply options',
@@ -569,7 +565,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // Show comments below a post.
+  // Display comments underneath a post.
   Widget _comments(String postId) {
     return StreamBuilder<
         QuerySnapshot<Map<String, dynamic>>>(
@@ -613,7 +609,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
               ),
             ),
 
-            // Comments stay hidden until the button is pressed.
             if (expanded)
               ...docs.map((doc) {
                 final data = doc.data();
@@ -629,9 +624,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         uid;
 
                 return Padding(
-                  padding: const EdgeInsets.only(
-                    top: 8,
-                    bottom: 8,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
                   ),
                   child: Row(
                     crossAxisAlignment:
@@ -648,7 +642,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   .toString(),
                               small: true,
                             ),
+
                             const SizedBox(height: 5),
+
                             Text(text),
 
                             if (data['updatedAt'] != null)
@@ -660,7 +656,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 ),
                               ),
 
-                            // New Reply button.
                             TextButton(
                               onPressed: () {
                                 _addReply(postId, doc.id);
@@ -668,13 +663,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               child: const Text('Reply'),
                             ),
 
-                            // Display replies to this comment.
                             _replyList(postId, doc.id),
                           ],
                         ),
                       ),
 
-                      // Only the comment owner can edit/delete.
                       if (mine)
                         PopupMenuButton<String>(
                           tooltip: 'Comment options',
@@ -715,6 +708,89 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
+  // RESPONSIVE POST IMAGE
+  //
+  // This is the updated part.
+  // On phones, images fit the available width.
+  // On computers, images stop growing at 550 pixels.
+  // BoxFit.contain keeps the full picture visible.
+  Widget _postImage(String imageUrl) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth;
+
+          // Maximum image width on larger screens.
+          final imageWidth =
+              availableWidth > 550 ? 550.0 : availableWidth;
+
+          // Use a shorter height on phone screens.
+          final imageHeight =
+              imageWidth < 400 ? 230.0 : 320.0;
+
+          return Center(
+            child: Container(
+              width: imageWidth,
+              height: imageHeight,
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.network(
+                imageUrl,
+                width: imageWidth,
+                height: imageHeight,
+
+                // Show the whole plant without cutting it off.
+                fit: BoxFit.contain,
+
+                // Show loading while the picture downloads.
+                loadingBuilder: (
+                  context,
+                  child,
+                  loadingProgress,
+                ) {
+                  if (loadingProgress == null) {
+                    return child;
+                  }
+
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                },
+
+                // Show a message if the image cannot load.
+                errorBuilder: (
+                  context,
+                  error,
+                  stackTrace,
+                ) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image_outlined),
+                          SizedBox(height: 8),
+                          Text('Image unavailable'),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // Build one Community post.
   Widget _post(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -732,7 +808,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
     return Card(
       margin: const EdgeInsets.symmetric(
-        horizontal: 12,
+        horizontal: 8,
         vertical: 7,
       ),
       child: Padding(
@@ -740,6 +816,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Username and post settings.
             Row(
               children: [
                 Expanded(
@@ -777,6 +854,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
             const SizedBox(height: 12),
 
+            // Post title.
             Text(
               (data['title'] ?? '').toString(),
               style: Theme.of(context).textTheme.titleMedium,
@@ -784,37 +862,20 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
             const SizedBox(height: 6),
 
+            // Post description.
             Text(
               (data['description'] ?? '').toString(),
             ),
 
-            // Display the post picture when there is one.
-            if (imageUrl.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  imageUrl,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (
-                    context,
-                    error,
-                    stackTrace,
-                  ) =>
-                      const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Image unavailable'),
-                  ),
-                ),
-              ),
-            ],
+            // Responsive picture.
+            if (imageUrl.isNotEmpty)
+              _postImage(imageUrl),
 
             const SizedBox(height: 7),
 
+            // Like, comment, and bookmark buttons.
             Row(
               children: [
-                // Like button.
                 StreamBuilder<
                     DocumentSnapshot<Map<String, dynamic>>>(
                   stream: _db.getLikeStatus(
@@ -840,7 +901,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   },
                 ),
 
-                // Number of likes.
                 StreamBuilder<
                     QuerySnapshot<Map<String, dynamic>>>(
                   stream: _db.getLikes(doc.id),
@@ -851,7 +911,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   },
                 ),
 
-                // Add comment button.
                 IconButton(
                   tooltip: 'Add comment',
                   onPressed: () {
@@ -864,7 +923,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
                 const Spacer(),
 
-                // Bookmark button.
                 StreamBuilder<
                     DocumentSnapshot<Map<String, dynamic>>>(
                   stream: _db.getSaveStatus(
@@ -896,7 +954,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               ],
             ),
 
-            // Comments and their replies.
+            // Comments and replies.
             _comments(doc.id),
           ],
         ),
@@ -920,130 +978,150 @@ class _CommunityScreenState extends State<CommunityScreen> {
       appBar: AppBar(
         title: const Text('Community'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const FindUsersScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.people_outline,
-                    ),
-                    label: const Text('Find People'),
-                  ),
-                ),
 
-                const SizedBox(width: 8),
-
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AddPostScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Post'),
-                  ),
-                ),
-              ],
-            ),
+      // Centers the Community feed on larger screens.
+      // On phones, it uses the available screen width.
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 700,
           ),
-
-          // Find the people this user follows.
-          Expanded(
-            child: StreamBuilder<
-                QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(user.uid)
-                  .collection('following')
-                  .snapshots(),
-              builder: (context, followingSnapshot) {
-                if (followingSnapshot.hasError) {
-                  return const Center(
-                    child: Text(
-                      'Unable to load followed users.',
+          child: Column(
+            children: [
+              // Find People and Add Post buttons.
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const FindUsersScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.people_outline,
+                        ),
+                        label: const Text('Find People'),
+                      ),
                     ),
-                  );
-                }
 
-                if (!followingSnapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
+                    const SizedBox(width: 8),
 
-                final followed = followingSnapshot.data!.docs
-                    .map((doc) => doc.id)
-                    .toSet()
-                  ..add(user.uid);
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AddPostScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add Post'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-                // Get Community posts from Firebase.
-                return StreamBuilder<
+              // Community feed.
+              Expanded(
+                child: StreamBuilder<
                     QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _db.getPosts(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('following')
+                      .snapshots(),
+                  builder: (context, followingSnapshot) {
+                    if (followingSnapshot.hasError) {
                       return const Center(
-                        child: Text('Unable to load posts.'),
+                        child: Text(
+                          'Unable to load followed users.',
+                        ),
                       );
                     }
 
-                    if (!snapshot.hasData) {
+                    if (!followingSnapshot.hasData) {
                       return const Center(
                         child: CircularProgressIndicator(),
                       );
                     }
 
-                    // Show your posts and followed users' posts.
-                    final posts = snapshot.data!.docs
-                        .where(
-                          (doc) => followed.contains(
-                            (doc.data()['userId'] ?? '')
-                                .toString(),
+                    // Posts from yourself and people you follow.
+                    final followed = followingSnapshot
+                        .data!.docs
+                        .map((doc) => doc.id)
+                        .toSet()
+                      ..add(user.uid);
+
+                    return StreamBuilder<
+                        QuerySnapshot<Map<String, dynamic>>>(
+                      stream: _db.getPosts(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Center(
+                            child: Text(
+                              'Unable to load posts.',
+                            ),
+                          );
+                        }
+
+                        if (!snapshot.hasData) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        final posts = snapshot.data!.docs
+                            .where(
+                              (doc) => followed.contains(
+                                (doc.data()['userId'] ?? '')
+                                    .toString(),
+                              ),
+                            )
+                            .toList();
+
+                        if (posts.isEmpty) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text(
+                                'No posts yet. Follow someone or create a post!',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.only(
+                            bottom: 20,
                           ),
-                        )
-                        .toList();
-
-                    if (posts.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No posts yet. Follow someone or create a post!',
-                        ),
-                      );
-                    }
-
-                    return ListView.builder(
-                      itemCount: posts.length,
-                      itemBuilder: (context, index) {
-                        return _post(
-                          posts[index],
-                          user.uid,
+                          itemCount: posts.length,
+                          itemBuilder: (context, index) {
+                            return _post(
+                              posts[index],
+                              user.uid,
+                            );
+                          },
                         );
                       },
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

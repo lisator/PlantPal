@@ -7,7 +7,6 @@ import '../models/my_plant.dart';
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
- 
   Future<void> addUser({
     required String uid,
     required String email,
@@ -120,6 +119,23 @@ class DatabaseService {
     }
   }
 
+  //cloudinary part for profile picture
+  Future<void> updateProfilePicture({
+    required String uid,
+    required String photoUrl,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null || currentUser.uid != uid) {
+      throw StateError(
+        'You can only change your own profile picture.',
+      );
+    }
+
+    await _db.collection('users').doc(uid).update({
+      'photoUrl': photoUrl,
+    });
+  }
 
   Future<void> followUser({
     required String currentUserId,
@@ -214,7 +230,6 @@ class DatabaseService {
 
   // Find people followed by accounts that you follow.
   // More shared connections means a higher suggestion score.
-
   Future<Map<String, int>> getSuggestedUserScores(
     String uid,
   ) async {
@@ -291,7 +306,6 @@ class DatabaseService {
 
   // Get a specific post using its document ID.
   // This is also used to display bookmarked posts.
-
   Future<DocumentSnapshot<Map<String, dynamic>>> getPost(
     String postId,
   ) async {
@@ -301,10 +315,8 @@ class DatabaseService {
         .get();
   }
 
-
   // A user can edit only their own post.
   // This updates the text without changing the image.
-
   Future<void> editPost({
     required String postId,
     required String title,
@@ -345,9 +357,7 @@ class DatabaseService {
     });
   }
 
-  Future<void> deletePost(
-    String postId,
-  ) async {
+  Future<void> deletePost(String postId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null) {
@@ -365,7 +375,6 @@ class DatabaseService {
 
     await postRef.delete();
   }
-
 
   Future<void> addComment({
     required String postId,
@@ -453,7 +462,6 @@ class DatabaseService {
     });
   }
 
-
   Future<void> deleteComment({
     required String postId,
     required String commentId,
@@ -532,7 +540,6 @@ class DatabaseService {
   }
 
   // Save a post to the signed-in user's collection.
-
   Future<void> savePost({
     required String userId,
     required String postId,
@@ -549,7 +556,6 @@ class DatabaseService {
   }
 
   // Remove a saved post.
-
   Future<void> unsavePost({
     required String userId,
     required String postId,
@@ -563,7 +569,6 @@ class DatabaseService {
   }
 
   // Check whether a post is already saved.
-
   Stream<DocumentSnapshot<Map<String, dynamic>>> getSaveStatus({
     required String userId,
     required String postId,
@@ -578,7 +583,6 @@ class DatabaseService {
 
   // Load all saved posts for the user's profile,
   // starting with the most recently saved.
-
   Stream<QuerySnapshot<Map<String, dynamic>>> getSavedPosts(
     String userId,
   ) {
@@ -592,7 +596,6 @@ class DatabaseService {
 
   // Doc ID is the Perenual species ID,
   // so a species cannot be added twice.
-
   Future<void> addMyPlant({
     required String userId,
     required MyPlant plant,
@@ -618,7 +621,6 @@ class DatabaseService {
   }
 
   // Record when the plant was last watered.
-
   Future<void> setLastWatered({
     required String userId,
     required String plantId,
@@ -638,7 +640,6 @@ class DatabaseService {
 
   // Set how often the plant should be watered.
   // Null clears the watering schedule.
-
   Future<void> setWaterEveryDays({
     required String userId,
     required String plantId,
@@ -653,7 +654,6 @@ class DatabaseService {
   }
 
   // Stream all plants belonging to the user.
-
   Stream<List<MyPlant>> getMyPlants(
     String userId,
   ) {
@@ -670,13 +670,12 @@ class DatabaseService {
                   ...doc.data(),
                   'id': doc.id,
                 }),
-          )
+              )
               .toList(),
         );
   }
 
   // Check whether a plant is already in My Plants.
-
   Stream<bool> isInMyPlants({
     required String userId,
     required int perenualId,
@@ -700,54 +699,51 @@ class DatabaseService {
     required List<Map<String, dynamic>> issues,
     required List<String> recommendedCare,
     String? imageUrl,
-    }) async {
-      await _db
-          .collection('users')
-          .doc(userId)
-          .collection('myPlants')
-          .doc(plantId)
-          .collection('analyses')
-          .add({
-        'scientificName': scientificName,
-        'commonName': commonName,
-        'confidence': confidence,
-        'healthStatus': healthStatus,
-        'issues': issues,
-        'recommendedCare': recommendedCare,
-        'imageUrl': imageUrl,
-        'analyzedAt': FieldValue.serverTimestamp(),
-      });
-    }
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc(plantId)
+        .collection('analyses')
+        .add({
+      'scientificName': scientificName,
+      'commonName': commonName,
+      'confidence': confidence,
+      'healthStatus': healthStatus,
+      'issues': issues,
+      'recommendedCare': recommendedCare,
+      'imageUrl': imageUrl,
+      'analyzedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> getPlantAnalyses({
+    required String userId,
+    required String plantId,
+  }) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc(plantId)
+        .collection('analyses')
+        .orderBy('analyzedAt', descending: true)
+        .snapshots();
+  }
 
-    Stream<QuerySnapshot<Map<String, dynamic>>> getPlantAnalyses({
-      required String userId,
-      required String plantId,
-    }) {
-      return _db
-          .collection('users')
-          .doc(userId)
-          .collection('myPlants')
-          .doc(plantId)
-          .collection('analyses')
-          .orderBy('analyzedAt', descending: true)
-          .snapshots();
-    }
-// =========================================================
-  // SAVED PLANTS (MY PLANTS)
-  // =========================================================
-
-  Future<void> addPlant( {
+  Future<void> addPlant({
     required String userID,
     required String name,
     required String species,
     required String description,
     String? imageUrl,
   }) async {
-    await _db.collection('users')
-    .doc(userID)
-    .collection('plants')
-    .add({
+    await _db
+        .collection('users')
+        .doc(userID)
+        .collection('plants')
+        .add({
       'userID': userID,
       'name': name,
       'species': species,
@@ -757,7 +753,9 @@ class DatabaseService {
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getUserPlants(String userID) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getUserPlants(
+    String userID,
+  ) {
     return _db
         .collection('users')
         .doc(userID)
@@ -777,17 +775,17 @@ class DatabaseService {
         .collection('plants')
         .doc(plantID)
         .update(updatedData);
-      }
+  }
 
-    Future<void> deletePlant({
-      required String userID,
-      required String plantID,
-    }) async {
-      await _db
-          .collection('users')
-          .doc(userID)
-          .collection('plants')
-          .doc(plantID)
-          .delete();
-    }
+  Future<void> deletePlant({
+    required String userID,
+    required String plantID,
+  }) async {
+    await _db
+        .collection('users')
+        .doc(userID)
+        .collection('plants')
+        .doc(plantID)
+        .delete();
+  }
 }
