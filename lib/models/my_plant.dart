@@ -2,13 +2,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'perenual_models.dart';
 
+
 /// A plant the user has added to My Plants.
 ///
 /// Stored at users/{uid}/myPlants/{perenualId}. A small snapshot of the care
 /// info is saved with it so My Plants can render without calling Perenual.
+
+//changes by breeze below
+/// A plant saved to the user's My Plants collection.
+///
+/// Plants may come from Perenual or from PlantPal's plant analysis.
+/// Perenual plants have a perenualId, while analysis-created plants
+/// use a PlantPal-generated id.
+
 class MyPlant {
   const MyPlant({
-    required this.perenualId,
+    required this.id, //added
+    this.perenualId,
     required this.commonName,
     required this.scientificName,
     this.imageUrl,
@@ -22,9 +32,11 @@ class MyPlant {
     this.addedAt,
   });
 
-  final int perenualId;
+  final String id;  //added
+  final int? perenualId;
   final String commonName;
   final String scientificName;
+
   final String? imageUrl;
   final String? nickname;
   final String? location;
@@ -71,7 +83,7 @@ class MyPlant {
   }
 
   PlantSearchResult toSearchResult() => PlantSearchResult(
-        id: perenualId,
+        id: perenualId ?? -1,  //changed with -1
         commonName: commonName,
         scientificName: scientificName,
         thumbnailUrl: imageUrl,
@@ -87,6 +99,7 @@ class MyPlant {
         (value == null || value.trim().isEmpty) ? null : value.trim();
 
     return MyPlant(
+      id: '${details.id}',
       perenualId: details.id,
       commonName: details.commonName,
       scientificName: details.scientificName,
@@ -100,13 +113,42 @@ class MyPlant {
     );
   }
 
+    factory MyPlant.fromAnalysis({
+    required String id,
+    required String commonName,
+    required String scientificName,
+    String? imageUrl,
+    String? nickname,
+    String? location,
+    }) {
+    String? clean(String? value) =>
+        (value == null || value.trim().isEmpty)
+            ? null
+            : value.trim();
+
+    return MyPlant(
+      id: id,
+      perenualId: null,
+      commonName: commonName,
+      scientificName: scientificName,
+      imageUrl: imageUrl,
+      nickname: clean(nickname),
+      location: clean(location),
+    );
+  }
+
   factory MyPlant.fromFirestore(Map<String, dynamic> data) {
     final addedAt = data['addedAt'];
     final lastWateredAt = data['lastWateredAt'];
     final watering = data['watering'] as String?;
     final wateringBenchmark = data['wateringBenchmark'] as String?;
+
     return MyPlant(
-      perenualId: (data['perenualId'] as num).toInt(),
+      id: data['id'] as String? ??  //added
+        '${(data['perenualId'] as num?)?.toInt() ?? 0}',
+
+      perenualId: (data['perenualId'] as num?)?.toInt(),
+
       commonName: data['commonName'] as String? ?? 'Unknown plant',
       scientificName: data['scientificName'] as String? ?? '',
       imageUrl: data['imageUrl'] as String?,
@@ -131,6 +173,7 @@ class MyPlant {
   }
 
   Map<String, dynamic> toFirestore() => {
+        'id': id,
         'perenualId': perenualId,
         'commonName': commonName,
         'scientificName': scientificName,

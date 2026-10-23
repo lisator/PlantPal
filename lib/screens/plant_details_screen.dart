@@ -525,7 +525,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
     try {
       await DatabaseService().removeMyPlant(
         userId: _userId!,
-        perenualId: widget.details.id,
+        plantId:'${widget.details.id}',
       );
       if (mounted) _showMessage('Removed from My Plants');
     } catch (e) {
