@@ -47,24 +47,6 @@ class AppDrawer extends StatelessWidget {
 
           ListTile(
             leading: const Icon(
-              Icons.message,
-            ),
-            title: const Text('Messages'),
-            onTap: () {
-              Navigator.pop(context);
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Messages will be added later.',
-                  ),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(
               Icons.settings,
             ),
             title: const Text('Settings'),
