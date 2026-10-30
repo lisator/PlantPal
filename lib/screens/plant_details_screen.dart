@@ -7,6 +7,7 @@ import '../services/perenual_service.dart';
 import '../widgets/plant_care_guide.dart';
 import '../widgets/watering.dart';
 import 'home_screen.dart';
+import '../widgets/health_history.dart';
 
 /// Opens the care page for a Perenual plant (from search or My Plants).
 // collapseCare: true when opened from my plants (sections start collapsed)
@@ -144,6 +145,15 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                       wikipedia: _wikipedia,
                       collapsible: widget.collapseCare,
                     ),
+
+                    if (widget.collapseCare) ...[
+                      const SizedBox(height: 28),
+
+                      HealthHistory(
+                        userId: currentUserId()!,
+                        plantId: '${details.id}',
+                      )
+                    ]
                   ],
                 ],
               ),

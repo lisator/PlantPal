@@ -18,9 +18,10 @@ class UploadScreen extends StatefulWidget {
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  Uint8List? _imageBytes;
+  final List<XFile> _selectedImages = [];
+  final List<Uint8List> _imageBytesList = [];
 
-  XFile? _selectedImage;
+  static const int _maxImages = 5;
 
   //String? _fileName;
   bool _isAnalyzing = false;
@@ -39,38 +40,93 @@ class _UploadScreenState extends State<UploadScreen> {
   Future<void> _pickImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
 
-    final XFile? image = await picker.pickImage(
-      source: source,
-    );
-
-    if (image == null) {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can select up to 5 images.'),
+        ),
+      );
       return;
     }
 
-    final bytes = await image.readAsBytes();
+    if (source == ImageSource.gallery) {
+      final List<XFile> images = await picker.pickMultiImage();
 
-    setState(() {
-      _imageBytes = bytes;
-      _selectedImage = image;
-     // _fileName = image.name;
+      if (images.isEmpty) {
+        return;
+      }
 
-    
+      final remainingSlots =
+          _maxImages - _selectedImages.length;
 
-      _scientificName = null;
-      _commonName = null;
-      _confidence = null;
-      _healthStatus = null;
-      _errorMessage = null;
+      final imagesToAdd =
+          images.take(remainingSlots).toList();
 
-      _healthIssues = [];
-      _recommendedCare = [];
-    });
+      final bytesToAdd = <Uint8List>[];
+
+      for (final image in imagesToAdd) {
+        bytesToAdd.add(await image.readAsBytes());
+      }
+
+      setState(() {
+        _selectedImages.addAll(imagesToAdd);
+        _imageBytesList.addAll(bytesToAdd);
+
+        _clearResults();
+      });
+
+      if (images.length > remainingSlots && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Only the first 5 images were added.',
+            ),
+          ),
+        );
+      }
+    } else {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+      );
+
+      if (image == null) {
+        return;
+      }
+
+      final bytes = await image.readAsBytes();
+
+      setState(() {
+        _selectedImages.add(image);
+        _imageBytesList.add(bytes);
+
+        _clearResults();
+      });
+    }
   }
 
+    void _clearResults() {
+    _scientificName = null;
+    _commonName = null;
+    _confidence = null;
+    _healthStatus = null;
+    _errorMessage = null;
+
+    _healthIssues = [];
+    _recommendedCare = [];
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+      _imageBytesList.removeAt(index);
+
+      _clearResults();
+    });
+  }
   Future<void> _analyzePlant() async {
-    if (_imageBytes == null) {
-      return;
-    }
+    if (_imageBytesList.isEmpty) {
+  return;
+}
 
     setState(() {
       _isAnalyzing = true;
@@ -89,7 +145,7 @@ class _UploadScreenState extends State<UploadScreen> {
       final plantApi = PlantApiService();
 
       final response = await plantApi.identifyPlant(
-        imageBytes: _imageBytes!,
+        imageBytesList: _imageBytesList,
       );
 
       // -----------------------------
@@ -212,8 +268,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
   void _resetAnalysis() {
   setState(() {
-    _imageBytes = null;
-    _selectedImage = null;
+    _selectedImages.clear();
+    _imageBytesList.clear();
     //_fileName = null;
 
     _scientificName = null;
@@ -241,7 +297,7 @@ Future<void> _createNewPlant() async {
 
   if (_scientificName == null ||
       _healthStatus == null ||
-      _selectedImage == null) {
+      _selectedImages.isEmpty) {
     return;
   }
 
@@ -297,7 +353,7 @@ Future<void> _createNewPlant() async {
 
   try {
     final imageUrl =
-        await CloudinaryService().uploadImage(_selectedImage!);
+        await CloudinaryService().uploadImage(_selectedImages.first);
 
     final plantId =
         'analysis_${DateTime.now().millisecondsSinceEpoch}';
@@ -375,7 +431,7 @@ Future<void> _saveToExistingPlant() async {
 
   if (_scientificName == null ||
       _healthStatus == null ||
-      _selectedImage == null) {
+      _selectedImages.isEmpty) {
     return;
   }
 
@@ -465,8 +521,7 @@ Future<void> _saveToExistingPlant() async {
 
     final imageUrl =
         await CloudinaryService().uploadImage(
-      _selectedImage!,
-    );
+      _selectedImages.first);
 
     await DatabaseService().addPlantAnalysis(
       userId: userId,
@@ -597,20 +652,65 @@ Future<void> _saveToExistingPlant() async {
           // SELECTED IMAGE
           // ------------------------------------------------------------
 
-          if (_imageBytes != null) ...[
-            const SizedBox(height: 16),
+          if (_imageBytesList.isNotEmpty) ...[
+              const SizedBox(height: 16),
 
-            ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: Image.memory(
-                _imageBytes!,
-                height: 300,
-                width: double.infinity,
-                fit: BoxFit.cover,
+              Text(
+                '${_imageBytesList.length} of $_maxImages photos selected',
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              SizedBox(
+                height: 120,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _imageBytesList.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.memory(
+                            _imageBytesList[index],
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: InkWell(
+                            onTap: () => _removeImage(index),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
             // ----------------------------------------------------------
             // ANALYZE BUTTON
@@ -701,18 +801,27 @@ Future<void> _saveToExistingPlant() async {
           // RESULT IMAGE
           // ------------------------------------------------------------
 
-          if (_imageBytes != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: Image.memory(
-                _imageBytes!,
-                height: 280,
-                width: double.infinity,
-                fit: BoxFit.cover,
+          if (_imageBytesList.isNotEmpty)
+            SizedBox(
+              height: 180,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _imageBytesList.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.memory(
+                      _imageBytesList[index],
+                      width: 180,
+                      height: 180,
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
               ),
             ),
-
-          const SizedBox(height: 16),
 
           // ============================================================
           // PLANT IDENTIFICATION CARD
