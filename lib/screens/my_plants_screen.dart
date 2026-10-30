@@ -9,11 +9,14 @@ import '../widgets/plant_care_guide.dart';
 
 import 'analysis_plant_details_screen.dart';
 
+/// Plants from search open the Perenual care page; plants saved from a photo
+/// analysis (no Perenual id) open the analysis details page.
 void openMyPlantDetails(BuildContext context, MyPlant plant) {
   if (plant.perenualId != null) {
     openPlantDetailsPage(
       context,
       plant.toSearchResult(),
+      collapseCare: true,
     );
     return;
   }
@@ -27,6 +30,18 @@ void openMyPlantDetails(BuildContext context, MyPlant plant) {
   );
 }
 
+/// One-line summary, e.g. "4 plants · 1 needs water today".
+/// Used on My Plants and the Dashboard.
+String plantSummary(List<MyPlant> plants) {
+  if (plants.isEmpty) return 'No plants saved yet';
+  final count = '${plants.length} plant${plants.length == 1 ? '' : 's'}';
+  // due today or overdue; plants with no schedule don't count
+  final due = plants.where((p) => (p.daysUntilWatering() ?? 1) <= 0).length;
+  if (due == 0) return '$count · nothing to water today';
+  return '$count · $due need${due == 1 ? 's' : ''} water today';
+}
+
+/// My Plants tab: the user's saved plants, live from Firestore.
 class MyPlantsScreen extends StatefulWidget {
   const MyPlantsScreen({super.key});
 
@@ -39,6 +54,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
   late final Stream<List<MyPlant>>? _plants =
       _userId == null ? null : DatabaseService().getMyPlants(_userId);
 
+  /// Asks before removing a plant.
   Future<void> _confirmRemove(String userId, MyPlant plant) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -77,6 +93,7 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
   Widget build(BuildContext context) {
     final userId = _userId;
 
+    // States: signed out, error, loading, empty, or the list.
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -124,16 +141,21 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                     separatorBuilder: (context, index) =>
                         SizedBox(height: index == 0 ? 16 : 12),
                     itemBuilder: (context, index) {
+                      // First row is the title and summary.
                       if (index == 0) {
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'My Plants',
                               style:
                                   Theme.of(context).textTheme.headlineSmall,
                             ),
-                            Text('${plants.length} saved'),
+                            const SizedBox(height: 4),
+                            Text(
+                              plantSummary(plants),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                           ],
                         );
                       }
@@ -198,16 +220,19 @@ class MyPlantCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(compact ? 14 : 16),
             child: Row(
+              crossAxisAlignment: compact
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.start,
               children: [
                 PlantThumbnailWithFallback(
                   url: plant.imageUrl,
                   scientificName: plant.scientificName,
                   commonName: plant.commonName,
-                  size: compact ? 40 : 56,
+                  size: compact ? 40 : 72,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: compact ? 12 : 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,12 +254,21 @@ class MyPlantCard extends StatelessWidget {
                       if (!compact) ...[
                         if (plant.location != null) ...[
                           const SizedBox(height: 8),
-                          Text('Location: ${plant.location}'),
+                          _CardDetail(
+                            icon: Icons.place_outlined,
+                            text: plant.location!,
+                          ),
                         ],
                         if (plant.wateringSummary != null) ...[
                           const SizedBox(height: 4),
-                          Text('Water: ${plant.wateringSummary}'),
+                          _CardDetail(
+                            icon: Icons.water_drop_outlined,
+                            text: plant.wateringSummary!,
+                          ),
                         ],
+                        const SizedBox(height: 4),
+                        const Divider(height: 16),
+                        // Watering status, "Watered" button, and schedule.
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 8,
@@ -293,6 +327,36 @@ class MyPlantCard extends StatelessWidget {
   }
 }
 
+/// Small icon + text line on a plant card (location, watering needs).
+class _CardDetail extends StatelessWidget {
+  const _CardDetail({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // muted icon, text cut off with "..." if too long
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Centered icon and text for the signed-out, error and empty states.
 class MyPlantsMessage extends StatelessWidget {
   const MyPlantsMessage({
     super.key,
