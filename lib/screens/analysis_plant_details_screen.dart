@@ -316,6 +316,8 @@ class _AnalysisCareGuideState extends State<_AnalysisCareGuide> {
           details: found ?? _namesOnly,
           wikipedia: _wikipedia,
           note: _note(found),
+          // only opened from my plants, so start collapsed
+          collapsible: true,
         );
       },
     );

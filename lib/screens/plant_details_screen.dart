@@ -8,10 +8,20 @@ import '../widgets/plant_care_guide.dart';
 import '../widgets/watering.dart';
 import 'home_screen.dart';
 
-void openPlantDetailsPage(BuildContext context, PlantSearchResult plant) {
+/// Opens the care page for a Perenual plant (from search or My Plants).
+// collapseCare: true when opened from my plants (sections start collapsed)
+void openPlantDetailsPage(
+  BuildContext context,
+  PlantSearchResult plant, {
+  bool collapseCare = false,
+}) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (context) => PlantDetailsScreen(plantId: plant.id, preview: plant),
+      builder: (context) => PlantDetailsScreen(
+        plantId: plant.id,
+        preview: plant,
+        collapseCare: collapseCare,
+      ),
     ),
   );
 }
@@ -23,10 +33,18 @@ void openPlantDetailsPage(BuildContext context, PlantSearchResult plant) {
 /// (which can take several seconds when Gemini is involved) then fills in
 /// whatever Perenual is missing, without holding up the rest of the page.
 class PlantDetailsScreen extends StatefulWidget {
-  const PlantDetailsScreen({super.key, required this.plantId, this.preview});
+  const PlantDetailsScreen({
+    super.key,
+    required this.plantId,
+    this.preview,
+    this.collapseCare = false,
+  });
 
   final int plantId;
   final PlantSearchResult? preview;
+
+  // collapse about and care guide (my plants), or show everything (search)
+  final bool collapseCare;
 
   @override
   State<PlantDetailsScreen> createState() => _PlantDetailsScreenState();
@@ -66,6 +84,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
     return PerenualService.instance.getPlantDetails(widget.plantId);
   }
 
+  // Header shows right away; below it is a spinner, an error, or the care info.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,6 +104,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                 children: [
                   FutureBuilder<WikipediaExtras>(
                     future: _wikipedia,
+                    // Uses Wikipedia's photo if Perenual has none.
                     builder: (context, wiki) => _PlantHeader(
                       name: details?.commonName ?? preview?.commonName ?? '',
                       scientificName: details?.scientificName ??
@@ -119,7 +139,11 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    PlantCareGuide(details: details, wikipedia: _wikipedia),
+                    PlantCareGuide(
+                      details: details,
+                      wikipedia: _wikipedia,
+                      collapsible: widget.collapseCare,
+                    ),
                   ],
                 ],
               ),
@@ -131,6 +155,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   }
 }
 
+/// Photo, name, scientific name and family at the top of the page.
 class _PlantHeader extends StatelessWidget {
   const _PlantHeader({
     required this.name,
@@ -230,6 +255,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
       ..showSnackBar(SnackBar(content: Text(message), action: action));
   }
 
+  /// Asks for nickname, location and watering schedule, then saves to Firestore.
   Future<void> _add() async {
     final input = await showDialog<
         ({String nickname, String location, int? waterEveryDays})>(
@@ -272,6 +298,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
     }
   }
 
+  /// Removes this plant from My Plants.
   Future<void> _remove() async {
     setState(() => _isBusy = true);
     try {
@@ -294,6 +321,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
       return const Text('Sign in to add plants to My Plants.');
     }
 
+    // Follows Firestore, so the button updates if the plant is added elsewhere.
     return StreamBuilder<bool>(
       stream: _isSaved,
       builder: (context, snapshot) {
@@ -327,6 +355,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
   }
 }
 
+/// Form shown before saving: nickname, location, and days between watering.
 class _AddPlantDialog extends StatefulWidget {
   const _AddPlantDialog({
     required this.plantName,
@@ -358,6 +387,7 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
     super.dispose();
   }
 
+  // Returns the form values to _add().
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     Navigator.pop(context, (
@@ -408,6 +438,7 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
                     : 'Perenual has no schedule for this plant. Leave blank '
                         'to set one later from My Plants.',
               ),
+              // No Perenual schedule: show Wikipedia's watering advice instead.
               if (reference != null &&
                   widget.suggestedWaterEveryDays == null) ...[
                 const SizedBox(height: 12),
@@ -439,6 +470,7 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
   }
 }
 
+/// Error message with a "Try again" button.
 class _ErrorPanel extends StatelessWidget {
   const _ErrorPanel({required this.message, required this.onRetry});
 
