@@ -107,10 +107,14 @@ class PlantCareGuide extends StatelessWidget {
     required this.details,
     required this.wikipedia,
     this.note,
+    this.collapsible = false,
   });
 
   final PlantDetails details;
   final Future<WikipediaExtras> wikipedia;
+
+  // true on my plants pages: about and care guide start collapsed
+  final bool collapsible;
 
   /// Shown under "Care guide", e.g. where the care info comes from. Defaults
   /// to a note for plants outside the free Perenual plan.
@@ -186,6 +190,25 @@ class PlantCareGuide extends StatelessWidget {
             PlantCareFact(icon: fact.$1, title: fact.$2, description: fact.$3!),
         ];
 
+        // care guide body: optional source note, then the care rows
+        final careContent = <Widget>[
+          if (note != null || details.isLimited)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                note ??
+                    'Care details for this plant are not included in our '
+                        'current Perenual plan, so Wikipedia is used instead.',
+                style: textTheme.bodySmall,
+              ),
+            ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            rows[i],
+          ],
+        ];
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -197,27 +220,27 @@ class PlantCareGuide extends StatelessWidget {
               ),
               const SizedBox(height: 20),
             ],
-            if (description != null) ...[
-              Text('About', style: textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(description),
-              const SizedBox(height: 24),
-            ],
-            Text('Care guide', style: textTheme.titleLarge),
-            if (note != null || details.isLimited)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  note ??
-                      'Care details for this plant are not included in our '
-                          'current Perenual plan, so Wikipedia is used instead.',
-                  style: textTheme.bodySmall,
+            if (collapsible) ...[
+              // tap a heading to open/close it
+              if (description != null)
+                _CollapsibleSection(
+                  title: 'About',
+                  children: [Text(description)],
                 ),
+              _CollapsibleSection(
+                title: 'Care guide',
+                subtitle: 'Water, light, soil and more',
+                children: careContent,
               ),
-            const SizedBox(height: 8),
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) const Divider(height: 1),
-              rows[i],
+            ] else ...[
+              if (description != null) ...[
+                Text('About', style: textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(description),
+                const SizedBox(height: 24),
+              ],
+              Text('Care guide', style: textTheme.titleLarge),
+              ...careContent,
             ],
             const SizedBox(height: 16),
             Text(
@@ -230,6 +253,34 @@ class PlantCareGuide extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Section heading that expands to show [children]. Starts collapsed.
+class _CollapsibleSection extends StatelessWidget {
+  const _CollapsibleSection({
+    required this.title,
+    required this.children,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: Text(title, style: Theme.of(context).textTheme.titleLarge),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      // no extra padding or borders, so it lines up with the rest of the page
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(bottom: 16),
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      children: children,
     );
   }
 }

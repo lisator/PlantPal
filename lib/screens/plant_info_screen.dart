@@ -5,6 +5,7 @@ import '../services/perenual_service.dart';
 import 'plant_details_screen.dart';
 import '../widgets/plant_care_guide.dart';
 
+/// Plant Search tab: searches Perenual and lists matching plants.
 class PlantSearch extends StatefulWidget {
   const PlantSearch({super.key});
 
@@ -13,6 +14,7 @@ class PlantSearch extends StatefulWidget {
 }
 
 class _PlantSearchState extends State<PlantSearch> {
+  // Quick-search chips shown before the first search.
   static const List<String> _suggestions = [
     'Monstera',
     'Pothos',
@@ -25,6 +27,7 @@ class _PlantSearchState extends State<PlantSearch> {
   final PerenualService _api = PerenualService.instance;
   final TextEditingController _controller = TextEditingController();
 
+  // Current search and its results (Perenual returns them in pages).
   String _activeQuery = '';
   List<PlantSearchResult> _results = [];
   int _page = 1;
@@ -56,12 +59,15 @@ class _PlantSearchState extends State<PlantSearch> {
     });
   }
 
+  // Called by Enter, the search icon, and the suggestion chips.
   void _searchNow(String value) {
     final query = value.trim();
     if (query.isNotEmpty) _search(query);
   }
 
+  /// Runs a new search, replacing the current results.
   Future<void> _search(String query) async {
+    // Skip if this exact search is already showing.
     if (query == _activeQuery && _error == null && !_isLoading) return;
 
     final requestId = ++_requestId;
@@ -91,6 +97,7 @@ class _PlantSearchState extends State<PlantSearch> {
     }
   }
 
+  /// Adds the next page of results to the list.
   Future<void> _loadMore() async {
     if (_isLoadingMore || !_hasMore) return;
     final requestId = _requestId;
@@ -114,11 +121,13 @@ class _PlantSearchState extends State<PlantSearch> {
     }
   }
 
+  // Fills the search box with a chip's text and searches it.
   void _useSuggestion(String suggestion) {
     _controller.text = suggestion;
     _searchNow(suggestion);
   }
 
+  // The X button: empties the box and goes back to the suggestions.
   void _clear() {
     _controller.clear();
     _onQueryChanged('');
@@ -143,6 +152,7 @@ class _PlantSearchState extends State<PlantSearch> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 16),
+                  // Rebuilds as you type so the clear button shows/hides.
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _controller,
                     builder: (context, value, _) => TextField(
@@ -180,6 +190,8 @@ class _PlantSearchState extends State<PlantSearch> {
     );
   }
 
+  /// Area below the search box: loading, error, suggestions, no results,
+  /// or the results list.
   Widget _buildBody(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -228,6 +240,7 @@ class _PlantSearchState extends State<PlantSearch> {
       );
     }
 
+    // Rows: result count, then the plants, then "Load more".
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       itemCount: _results.length + 2,
@@ -263,6 +276,8 @@ class _PlantSearchState extends State<PlantSearch> {
   }
 }
 
+/// One search result: photo, names, and a "Basic info only" label for
+/// plants outside Perenual's free plan.
 class PlantSearchResultCard extends StatelessWidget {
   const PlantSearchResultCard({
     super.key,
@@ -339,6 +354,7 @@ class PlantSearchResultCard extends StatelessWidget {
   }
 }
 
+/// Centered icon and text for the empty, error and no-results states.
 class _SearchMessage extends StatelessWidget {
   const _SearchMessage({
     required this.icon,
