@@ -51,6 +51,7 @@ void openMyPlantDetails(BuildContext context, MyPlant plant) {
       context,
       plant.toSearchResult(),
       collapseCare: true,
+      fromMyPlants: true,
     );
     return;
   }

@@ -7,6 +7,7 @@ import '../services/perenual_service.dart';
 import '../widgets/plant_care_guide.dart';
 import '../widgets/watering.dart';
 import 'home_screen.dart';
+import '../widgets/health_history.dart';
 
 // PlantPal colors, same palette as the community screen.
 const Color _forest = Color(0xFF315F43);
@@ -48,6 +49,7 @@ void openPlantDetailsPage(
   BuildContext context,
   PlantSearchResult plant, {
   bool collapseCare = false,
+  bool fromMyPlants = false,
 }) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
@@ -55,6 +57,7 @@ void openPlantDetailsPage(
         plantId: plant.id,
         preview: plant,
         collapseCare: collapseCare,
+        fromMyPlants: fromMyPlants,
       ),
     ),
   );
@@ -72,6 +75,7 @@ class PlantDetailsScreen extends StatefulWidget {
     required this.plantId,
     this.preview,
     this.collapseCare = false,
+    this.fromMyPlants = false,
   });
 
   final int plantId;
@@ -79,6 +83,10 @@ class PlantDetailsScreen extends StatefulWidget {
 
   // collapse about and care guide (my plants and search), or show everything
   final bool collapseCare;
+
+  // true when opened from my plants: shows the plant's health history
+  // (search also collapses care info, but isn't a saved plant)
+  final bool fromMyPlants;
 
   @override
   State<PlantDetailsScreen> createState() => _PlantDetailsScreenState();
@@ -121,6 +129,9 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   // Header shows right away; below it is a spinner, an error, or the care info.
   @override
   Widget build(BuildContext context) {
+    // health history keeps the app's default look, not this page's colors
+    final healthHistoryTheme = Theme.of(context);
+
     return Theme(
       data: _screenTheme(Theme.of(context)),
       child: Scaffold(
@@ -191,6 +202,18 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                       wikipedia: _wikipedia,
                       collapsible: widget.collapseCare,
                     ),
+
+                    if (widget.fromMyPlants && currentUserId() != null) ...[
+                      const SizedBox(height: 28),
+
+                      Theme(
+                        data: healthHistoryTheme,
+                        child: HealthHistory(
+                          userId: currentUserId()!,
+                          plantId: '${details.id}',
+                        ),
+                      ),
+                    ]
                   ],
                 ],
               ),
