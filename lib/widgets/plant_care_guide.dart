@@ -157,6 +157,70 @@ class PlantCareGuide extends StatelessWidget {
     );
   }
 
+  /// Wikipedia sometimes gives two topics the same sentence, e.g. one
+  /// sentence about both light and water. That excerpt is shown once, titled
+  /// with every topic it covers ("Water & Light"), instead of repeating it.
+  /// Perenual rows are never combined.
+  static List<Widget> _combineDuplicateExcerpts(List<Widget> careRows) {
+    // Each Wikipedia excerpt group sits where its first topic was, with that
+    // topic's icon. Other rows are kept as they are.
+    final groups = <({IconData icon, List<String> titles, CareExcerpt excerpt})>[];
+    final combined = <Object>[];
+    for (final row in careRows) {
+      if (row is! WikipediaCareFact) {
+        combined.add(row);
+        continue;
+      }
+      final index = groups.indexWhere(
+        (group) => _sameExcerpt(group.excerpt.text, row.excerpt.text),
+      );
+      if (index == -1) {
+        groups.add((icon: row.icon, titles: [row.title], excerpt: row.excerpt));
+        combined.add(groups.length - 1);
+        continue;
+      }
+      final group = groups[index];
+      groups[index] = (
+        icon: group.icon,
+        titles: [...group.titles, row.title],
+        // keep the longer excerpt when one contains the other
+        excerpt: row.excerpt.text.length > group.excerpt.text.length
+            ? row.excerpt
+            : group.excerpt,
+      );
+    }
+
+    String joinTitles(List<String> titles) => titles.length == 1
+        ? titles.single
+        : '${titles.sublist(0, titles.length - 1).join(', ')} & ${titles.last}';
+
+    return [
+      for (final item in combined)
+        if (item is int)
+          WikipediaCareFact(
+            icon: groups[item].icon,
+            title: joinTitles(groups[item].titles),
+            excerpt: groups[item].excerpt,
+          )
+        else
+          item as Widget,
+    ];
+  }
+
+  /// True when two excerpts are the same text, or one contains the other,
+  /// ignoring case, spacing and quote styles.
+  static bool _sameExcerpt(String a, String b) {
+    String normalize(String text) => text
+        .toLowerCase()
+        .replaceAll(RegExp('[‘’]'), "'")
+        .replaceAll(RegExp('[“”]'), '"')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final first = normalize(a);
+    final second = normalize(b);
+    return first.contains(second) || second.contains(first);
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -183,9 +247,11 @@ class PlantCareGuide extends StatelessWidget {
         final article = wiki.data?.article;
         final description = details.description ?? article?.extract;
         final rows = [
-          _careRow(CareTopic.water, Icons.water_drop_outlined, 'Water', wiki),
-          _careRow(CareTopic.light, Icons.wb_sunny_outlined, 'Light', wiki),
-          _careRow(CareTopic.soil, Icons.grass, 'Soil', wiki),
+          ..._combineDuplicateExcerpts([
+            _careRow(CareTopic.water, Icons.water_drop_outlined, 'Water', wiki),
+            _careRow(CareTopic.light, Icons.wb_sunny_outlined, 'Light', wiki),
+            _careRow(CareTopic.soil, Icons.grass, 'Soil', wiki),
+          ]),
           for (final fact in otherFacts)
             PlantCareFact(icon: fact.$1, title: fact.$2, description: fact.$3!),
         ];
