@@ -5,6 +5,41 @@ import '../services/perenual_service.dart';
 import 'plant_details_screen.dart';
 import '../widgets/plant_care_guide.dart';
 
+// PlantPal colors, same palette as the community screen.
+const Color _forest = Color(0xFF315F43);
+const Color _sage = Color(0xFF83AD8A);
+const Color _pale = Color(0xFFF6F8F2);
+const Color _mint = Color(0xFFE0EBDD);
+const Color _ink = Color(0xFF24372A);
+
+// Rounded card with a mint border and soft shadow, like the community posts.
+const RoundedRectangleBorder _cardShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(20)),
+  side: BorderSide(color: _mint),
+);
+final Color _cardShadow = _forest.withValues(alpha: 0.12);
+
+// Forest buttons, spinners, and text fields instead of Flutter's default
+// purple, like the community screen's own theme.
+ThemeData _screenTheme(ThemeData base) => base.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _forest,
+        primary: _forest,
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: _forest),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _forest,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(foregroundColor: _forest),
+      ),
+    );
+
 /// Plant Search tab: searches Perenual and lists matching plants.
 class PlantSearch extends StatefulWidget {
   const PlantSearch({super.key});
@@ -135,7 +170,11 @@ class _PlantSearchState extends State<PlantSearch> {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
+    return Theme(
+      data: _screenTheme(Theme.of(context)),
+      child: ColoredBox(
+      color: _pale,
+      child: Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
@@ -149,7 +188,13 @@ class _PlantSearchState extends State<PlantSearch> {
                 children: [
                   Text(
                     'Plant Search',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(
+                          color: _ink,
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   // Rebuilds as you type so the clear button shows/hides.
@@ -164,6 +209,7 @@ class _PlantSearchState extends State<PlantSearch> {
                         helperText: 'Press Enter to search',
                         prefixIcon: IconButton(
                           tooltip: 'Search',
+                          color: _forest,
                           icon: const Icon(Icons.search),
                           onPressed: () => _searchNow(_controller.text),
                         ),
@@ -171,10 +217,27 @@ class _PlantSearchState extends State<PlantSearch> {
                             ? null
                             : IconButton(
                                 tooltip: 'Clear search',
+                                color: _forest,
                                 icon: const Icon(Icons.clear),
                                 onPressed: _clear,
                               ),
-                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Colors.white,
+                        floatingLabelStyle:
+                            const TextStyle(color: _forest),
+                        border: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(20)),
+                          borderSide: BorderSide(color: _mint),
+                        ),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(20)),
+                          borderSide: BorderSide(color: _mint),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(20)),
+                          borderSide:
+                              BorderSide(color: _forest, width: 2),
+                        ),
                       ),
                       onChanged: _onQueryChanged,
                       onSubmitted: _searchNow,
@@ -186,6 +249,8 @@ class _PlantSearchState extends State<PlantSearch> {
             Expanded(child: _buildBody(context)),
           ],
         ),
+      ),
+      ),
       ),
     );
   }
@@ -203,6 +268,10 @@ class _PlantSearchState extends State<PlantSearch> {
         title: 'Something went wrong',
         message: _error!,
         action: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: _forest,
+            foregroundColor: Colors.white,
+          ),
           onPressed: () => _search(_activeQuery),
           icon: const Icon(Icons.refresh),
           label: const Text('Try again'),
@@ -223,6 +292,10 @@ class _PlantSearchState extends State<PlantSearch> {
           children: [
             for (final suggestion in _suggestions)
               ActionChip(
+                backgroundColor: _mint,
+                side: BorderSide.none,
+                shape: const StadiumBorder(),
+                labelStyle: const TextStyle(color: _forest),
                 label: Text(suggestion),
                 onPressed: () => _useSuggestion(suggestion),
               ),
@@ -261,6 +334,10 @@ class _PlantSearchState extends State<PlantSearch> {
                     child: CircularProgressIndicator(),
                   )
                 : OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _forest,
+                      side: const BorderSide(color: _sage),
+                    ),
                     onPressed: _loadMore,
                     child: const Text('Load more'),
                   ),
@@ -269,7 +346,12 @@ class _PlantSearchState extends State<PlantSearch> {
         final plant = _results[index - 1];
         return PlantSearchResultCard(
           plant: plant,
-          onTap: () => openPlantDetailsPage(context, plant),
+          // care info starts collapsed, same as from My Plants
+          onTap: () => openPlantDetailsPage(
+            context,
+            plant,
+            collapseCare: true,
+          ),
         );
       },
     );
@@ -294,9 +376,14 @@ class PlantSearchResultCard extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 1,
+      shadowColor: _cardShadow,
+      shape: _cardShape,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -305,9 +392,9 @@ class PlantSearchResultCard extends StatelessWidget {
                 url: plant.thumbnailUrl,
                 scientificName: plant.scientificName,
                 commonName: plant.commonName,
-                size: 48,
+                size: 56,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +404,10 @@ class PlantSearchResultCard extends StatelessWidget {
                       plant.commonName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleMedium,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: _ink,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (plant.scientificName.isNotEmpty)
                       Text(
@@ -335,17 +425,28 @@ class PlantSearchResultCard extends StatelessWidget {
                         style: textTheme.bodySmall,
                       ),
                     if (!plant.hasFullDetails)
-                      Text(
-                        'Basic info only',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _mint,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'Basic info only',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: _forest,
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right),
+              const Icon(Icons.chevron_right, color: _forest),
             ],
           ),
         ),
@@ -370,20 +471,21 @@ class _SearchMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: colors.primary),
+            Icon(icon, size: 48, color: _forest),
             const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: _ink),
             ),
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
