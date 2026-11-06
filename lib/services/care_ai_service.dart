@@ -72,7 +72,6 @@ Rules:
 
     for (final name in modelNames) {
       try {
-        // No time limit: a slow answer is better than no care info.
         final response =
             await _model(name).generateContent([Content.text(text)]);
         final json = jsonDecode(response.text ?? '');
