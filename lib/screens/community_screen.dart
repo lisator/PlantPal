@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
 import '../services/reply_service.dart';
+import '../widgets/post_photo_gallery.dart';
 
 import 'add_post_screen.dart';
 import 'find_users_screen.dart';
@@ -725,90 +726,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // RESPONSIVE POST IMAGE
-  //
-  // This is the updated part.
-  // On phones, images fit the available width.
-  // On computers, images stop growing at 550 pixels.
-  // BoxFit.contain keeps the full picture visible.
-
-  Widget _postImage(String imageUrl) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth;
-
-          // Maximum image width on larger screens.
-          final imageWidth =
-              availableWidth > 550 ? 550.0 : availableWidth;
-
-          // Use a shorter height on phone screens.
-          final imageHeight =
-              imageWidth < 400 ? 230.0 : 320.0;
-
-          return Center(
-            child: Container(
-              width: imageWidth,
-              height: imageHeight,
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Image.network(
-                imageUrl,
-                width: imageWidth,
-                height: imageHeight,
-
-                // Show the whole plant without cutting it off.
-                fit: BoxFit.contain,
-
-                // Show loading while the picture downloads.
-                loadingBuilder: (
-                  context,
-                  child,
-                  loadingProgress,
-                ) {
-                  if (loadingProgress == null) {
-                    return child;
-                  }
-
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                },
-
-                // Show a message if the image cannot load.
-                errorBuilder: (
-                  context,
-                  error,
-                  stackTrace,
-                ) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.broken_image_outlined),
-                          SizedBox(height: 8),
-                          Text('Image unavailable'),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   // Build one Community post.
   Widget _post(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -819,8 +736,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final owner =
         (data['userId'] ?? '').toString();
 
-    final imageUrl =
-        (data['imageUrl'] ?? '').toString();
+    // Get all pictures, including older single-image posts.
+    final List<String> images = postImageUrls(data);
 
     final mine = owner == uid;
 
@@ -875,16 +792,21 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ),
               ],
             ),
+
             const SizedBox(height: 12),
 
             // Post title.
             Text(
               (data['title'] ?? '').toString(),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(
                     color: _ink,
                     fontWeight: FontWeight.w700,
                   ),
             ),
+
             const SizedBox(height: 6),
 
             // Post description.
@@ -892,9 +814,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
               (data['description'] ?? '').toString(),
             ),
 
-            // Responsive picture.
-            if (imageUrl.isNotEmpty)
-              _postImage(imageUrl),
+            // Swipe through pictures.
+            // Tap a picture to open it full-screen.
+            if (images.isNotEmpty)
+              PostPhotoGallery(
+                key: ValueKey(doc.id),
+                imageUrls: images,
+              ),
 
             const SizedBox(height: 10),
             const Divider(color: _mint, height: 1),
@@ -928,6 +854,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     );
                   },
                 ),
+
                 StreamBuilder<
                     QuerySnapshot<Map<String, dynamic>>>(
                   stream: _db.getLikes(doc.id),
@@ -937,6 +864,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     );
                   },
                 ),
+
                 IconButton(
                   tooltip: 'Add comment',
                   onPressed: () {
@@ -947,6 +875,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     color: _forest,
                   ),
                 ),
+
                 StreamBuilder<
                     QuerySnapshot<Map<String, dynamic>>>(
                   stream: _db.getComments(doc.id),
@@ -955,7 +884,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     style: const TextStyle(color: _forest),
                   ),
                 ),
+
                 const Spacer(),
+
                 StreamBuilder<
                     DocumentSnapshot<Map<String, dynamic>>>(
                   stream: _db.getSaveStatus(
@@ -996,7 +927,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // Show the available Community posts using the selected feed.
+  // Show Community posts from Explore or Following.
   Widget _communityFeed(String userId) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _db.getFollowing(userId),
@@ -1018,7 +949,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
             .toSet()
           ..add(userId);
 
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        return StreamBuilder<
+            QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.getPosts(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
@@ -1034,10 +966,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
             }
 
             final posts = snapshot.data!.docs.where((post) {
-              // Explore shows everyone. Following keeps the original filter.
+              // Explore shows everyone.
+              // Following shows followed users and your posts.
               return _showExplore ||
                   followed.contains(
-                    (post.data()['userId'] ?? '').toString(),
+                    (post.data()['userId'] ?? '')
+                        .toString(),
                   );
             }).toList();
 
@@ -1059,7 +993,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             ? 'No Community posts yet. Be the first to share!'
                             : 'No posts yet. Follow someone or create a post!',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: _forest),
+                        style: const TextStyle(
+                          color: _forest,
+                        ),
                       ),
                     ],
                   ),
@@ -1133,15 +1069,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
           surfaceTintColor: _pale,
         ),
 
-        // The header now scrolls away with the posts.
-        // This gives posts more space on smaller screens.
+        // The header scrolls with the posts.
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: 700,
             ),
             child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) {
+              headerSliverBuilder:
+                  (context, innerBoxIsScrolled) {
                 return [
                   SliverToBoxAdapter(
                     child: Column(
@@ -1203,7 +1139,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   ),
                                 ),
                               ),
+
                               const SizedBox(width: 8),
+
                               Expanded(
                                 child: FilledButton.icon(
                                   onPressed: () {
@@ -1258,7 +1196,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ];
               },
 
-              // Posts scroll beneath the upper header.
+              // Posts scroll beneath the header.
               body: _communityFeed(user.uid),
             ),
           ),
@@ -1267,8 +1205,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-
-  // Button used to switch between Explore and Following.
+  // Button used to switch Explore and Following.
   Widget _feedTab(
     String text,
     IconData icon,
@@ -1305,7 +1242,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   text,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected ? Colors.white : _forest,
+                    color:
+                        selected ? Colors.white : _forest,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

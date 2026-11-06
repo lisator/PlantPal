@@ -1,10 +1,11 @@
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../widgets/post_photo_gallery.dart';
+
 import 'follow_list_screen.dart';
 import 'user_posts_screen.dart';
 
@@ -17,14 +18,13 @@ class UserProfileScreen extends StatelessWidget {
   });
 
   // PlantPal colors.
-  // These colors only affect this profile screen.
   static const Color _forest = Color(0xFF315F43);
   static const Color _sage = Color(0xFF83AD8A);
   static const Color _pale = Color(0xFFF6F8F2);
   static const Color _mint = Color(0xFFE0EBDD);
   static const Color _ink = Color(0xFF24372A);
 
-  // Display an error message if following or unfollowing fails.
+  // Display an error if following or unfollowing fails.
   void _showError(BuildContext context, Object error) {
     if (!context.mounted) return;
 
@@ -36,7 +36,7 @@ class UserProfileScreen extends StatelessWidget {
   }
 
   // Display a profile statistic.
-  // Tapping it opens the corresponding page.
+  // Tapping it opens the corresponding screen.
   Widget _stat({
     required Stream<QuerySnapshot<Map<String, dynamic>>> stream,
     required String label,
@@ -86,7 +86,7 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  // Display the Follow or Unfollow button.
+  // Follow or Unfollow button.
   Widget _followButton({
     required BuildContext context,
     required DatabaseService databaseService,
@@ -108,8 +108,7 @@ class UserProfileScreen extends StatelessWidget {
         final bool following =
             followSnapshot.data?.exists ?? false;
 
-        final bool loading =
-            !followSnapshot.hasData;
+        final bool loading = !followSnapshot.hasData;
 
         return SizedBox(
           width: double.infinity,
@@ -134,10 +133,13 @@ class UserProfileScreen extends StatelessWidget {
                               targetUserId: userId,
                             );
                           } catch (e) {
+                            if (!context.mounted) return;
                             _showError(context, e);
                           }
                         },
-                  icon: const Icon(Icons.person_remove_outlined),
+                  icon: const Icon(
+                    Icons.person_remove_outlined,
+                  ),
                   label: const Text('Following'),
                 )
               : FilledButton.icon(
@@ -160,10 +162,13 @@ class UserProfileScreen extends StatelessWidget {
                               targetUserId: userId,
                             );
                           } catch (e) {
+                            if (!context.mounted) return;
                             _showError(context, e);
                           }
                         },
-                  icon: const Icon(Icons.person_add_alt_1),
+                  icon: const Icon(
+                    Icons.person_add_alt_1,
+                  ),
                   label: const Text('Follow'),
                 ),
         );
@@ -173,6 +178,7 @@ class UserProfileScreen extends StatelessWidget {
 
   // Display one Community post on the user's profile.
   Widget _postCard(
+    String postId,
     Map<String, dynamic> data,
   ) {
     final title =
@@ -181,8 +187,8 @@ class UserProfileScreen extends StatelessWidget {
     final description =
         (data['description'] ?? '').toString();
 
-    final imageUrl =
-        (data['imageUrl'] ?? '').toString();
+    // Supports old single-picture posts and new galleries.
+    final List<String> images = postImageUrls(data);
 
     return Card(
       color: Colors.white,
@@ -219,65 +225,13 @@ class UserProfileScreen extends StatelessWidget {
               ),
             ),
 
-            // Display the post picture when one exists.
-            if (imageUrl.isNotEmpty) ...[
-              const SizedBox(height: 12),
-
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  width: double.infinity,
-                  height: 260,
-                  color: _pale,
-                  child: Image.network(
-                    imageUrl,
-                    width: double.infinity,
-
-                    // Keep the whole plant picture visible.
-                    fit: BoxFit.contain,
-
-                    // Show loading while the image downloads.
-                    loadingBuilder: (
-                      context,
-                      child,
-                      loadingProgress,
-                    ) {
-                      if (loadingProgress == null) {
-                        return child;
-                      }
-
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: _forest,
-                        ),
-                      );
-                    },
-
-                    // Show a message if the picture cannot load.
-                    errorBuilder: (
-                      context,
-                      error,
-                      stackTrace,
-                    ) {
-                      return const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.broken_image_outlined,
-                              color: _sage,
-                              size: 36,
-                            ),
-                            SizedBox(height: 8),
-                            Text('Unable to load image'),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+            // Swipe through all attached pictures.
+            // Tap to open the full-screen viewer.
+            if (images.isNotEmpty)
+              PostPhotoGallery(
+                key: ValueKey(postId),
+                imageUrls: images,
               ),
-            ],
           ],
         ),
       ),
@@ -365,7 +319,10 @@ class UserProfileScreen extends StatelessWidget {
 
         return Column(
           children: posts.map((post) {
-            return _postCard(post.data());
+            return _postCard(
+              post.id,
+              post.data(),
+            );
           }).toList(),
         );
       },
@@ -646,14 +603,14 @@ class UserProfileScreen extends StatelessWidget {
                       const SizedBox(height: 26),
 
                       // USER COMMUNITY POSTS
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.spa_outlined,
                             color: _forest,
                           ),
-                          const SizedBox(width: 8),
-                          const Expanded(
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text(
                               'Community Posts',
                               style: TextStyle(

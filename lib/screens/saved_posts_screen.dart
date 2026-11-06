@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../widgets/post_photo_gallery.dart';
 import 'user_profile_screen.dart';
 
 class SavedPostsScreen extends StatelessWidget {
@@ -210,7 +211,6 @@ class SavedPostsScreen extends StatelessWidget {
           },
           child: Row(
             children: [
-              // Use the author's Cloudinary profile picture.
               CircleAvatar(
                 radius: 22,
                 backgroundColor: _mint,
@@ -248,71 +248,6 @@ class SavedPostsScreen extends StatelessWidget {
     );
   }
 
-  // Display the picture attached to the original post.
-  Widget _postImage(String imageUrl) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: double.infinity,
-          height: 260,
-          color: _pale,
-          child: Image.network(
-            imageUrl,
-            width: double.infinity,
-            height: 260,
-
-            // Keep the full plant picture visible.
-            fit: BoxFit.contain,
-
-            // Show loading while the picture downloads.
-            loadingBuilder: (
-              context,
-              child,
-              loadingProgress,
-            ) {
-              if (loadingProgress == null) {
-                return child;
-              }
-
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: _forest,
-                ),
-              );
-            },
-
-            // Show a message if the picture cannot load.
-            errorBuilder: (
-              context,
-              error,
-              stackTrace,
-            ) {
-              return const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.broken_image_outlined,
-                      size: 38,
-                      color: _sage,
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Unable to load image',
-                      style: TextStyle(color: _forest),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
   // Display one bookmarked Community post.
   Widget _savedPostCard({
     required BuildContext context,
@@ -327,8 +262,7 @@ class SavedPostsScreen extends StatelessWidget {
     final description =
         (data['description'] ?? '').toString();
 
-    final imageUrl =
-        (data['imageUrl'] ?? '').toString();
+    final List<String> images = postImageUrls(data);
 
     final authorId =
         (data['userId'] ?? '').toString();
@@ -380,9 +314,12 @@ class SavedPostsScreen extends StatelessWidget {
               ),
             ),
 
-            // POST IMAGE
-            if (imageUrl.isNotEmpty)
-              _postImage(imageUrl),
+            // Swipe and open all pictures.
+            if (images.isNotEmpty)
+              PostPhotoGallery(
+                key: ValueKey(postId),
+                imageUrls: images,
+              ),
 
             const SizedBox(height: 14),
 
@@ -442,7 +379,6 @@ class SavedPostsScreen extends StatelessWidget {
       );
     }
 
-    // Apply PlantPal colors to Saved Posts only.
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: ColorScheme.fromSeed(
