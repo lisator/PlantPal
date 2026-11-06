@@ -3,9 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/my_plant.dart';
+import 'notification_service.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // USER ACCOUNTS
 
   Future<void> addUser({
     required String uid,
@@ -92,6 +95,8 @@ class DatabaseService {
     return false;
   }
 
+  // PROFILE
+
   Future<void> updateProfile({
     required String uid,
     String? displayName,
@@ -119,7 +124,7 @@ class DatabaseService {
     }
   }
 
-  //cloudinary part for profile picture
+  // Save the Cloudinary profile picture URL.
   Future<void> updateProfilePicture({
     required String uid,
     required String photoUrl,
@@ -136,6 +141,8 @@ class DatabaseService {
       'photoUrl': photoUrl,
     });
   }
+
+  // FOLLOWING
 
   Future<void> followUser({
     required String currentUserId,
@@ -170,6 +177,17 @@ class DatabaseService {
     });
 
     await batch.commit();
+
+    // Notify the person who gained a follower.
+    // A notification failure does not undo the follow.
+    try {
+      await NotificationService().follower(
+        followerId: currentUserId,
+        recipientId: targetUserId,
+      );
+    } catch (_) {
+      // The follow relationship is already saved.
+    }
   }
 
   Future<void> unfollowUser({
@@ -228,8 +246,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Find people followed by accounts that you follow.
-  // More shared connections means a higher suggestion score.
+  // Find people followed by accounts you follow.
   Future<Map<String, int>> getSuggestedUserScores(
     String uid,
   ) async {
@@ -240,7 +257,6 @@ class DatabaseService {
         .limit(40)
         .get();
 
-    // Exclude yourself and people you already follow.
     final excluded = <String>{
       uid,
       ...following.docs.map((doc) => doc.id),
@@ -248,7 +264,6 @@ class DatabaseService {
 
     final scores = <String, int>{};
 
-    // Check the people each followed user follows.
     for (final friend in following.docs) {
       final theirFollowing = await _db
           .collection('users')
@@ -271,19 +286,39 @@ class DatabaseService {
     return scores;
   }
 
+  // COMMUNITY POSTS
+
+  // Supports one picture or up to five pictures.
+  // imageUrl is retained for older Community screens.
   Future<void> addPost({
     required String userId,
     required String userEmail,
     required String title,
     required String description,
     String imageUrl = '',
+    List<String>? imageUrls,
   }) async {
+    final photos = imageUrls ??
+        (imageUrl.isNotEmpty ? [imageUrl] : <String>[]);
+
+    if (photos.length > 5) {
+      throw ArgumentError(
+        'A post can have no more than 5 pictures.',
+      );
+    }
+
     await _db.collection('posts').add({
       'userId': userId,
       'userEmail': userEmail,
       'title': title,
       'description': description,
-      'imageUrl': imageUrl,
+
+      // First picture for older screens.
+      'imageUrl': photos.isNotEmpty ? photos.first : '',
+
+      // All pictures for the gallery.
+      'imageUrls': photos,
+
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
@@ -304,8 +339,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Get a specific post using its document ID.
-  // This is also used to display bookmarked posts.
+  // Get a specific post, including bookmarked posts.
   Future<DocumentSnapshot<Map<String, dynamic>>> getPost(
     String postId,
   ) async {
@@ -315,8 +349,7 @@ class DatabaseService {
         .get();
   }
 
-  // A user can edit only their own post.
-  // This updates the text without changing the image.
+  // Edit only your own post.
   Future<void> editPost({
     required String postId,
     required String title,
@@ -376,6 +409,8 @@ class DatabaseService {
     await postRef.delete();
   }
 
+  // COMMENTS
+
   Future<void> addComment({
     required String postId,
     required String userId,
@@ -398,7 +433,7 @@ class DatabaseService {
       );
     }
 
-    await _db
+    final createdComment = await _db
         .collection('posts')
         .doc(postId)
         .collection('comments')
@@ -408,6 +443,26 @@ class DatabaseService {
       'comment': newComment,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Notify the author of the original post.
+    try {
+      final post = await _db
+          .collection('posts')
+          .doc(postId)
+          .get();
+
+      final recipientId =
+          (post.data()?['userId'] ?? '').toString();
+
+      await NotificationService().comment(
+        actorId: userId,
+        recipientId: recipientId,
+        postId: postId,
+        commentId: createdComment.id,
+      );
+    } catch (_) {
+      // Keep the comment even if notification fails.
+    }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getComments(
@@ -490,6 +545,8 @@ class DatabaseService {
     await commentRef.delete();
   }
 
+  // POST LIKES
+
   Future<void> likePost({
     required String postId,
     required String userId,
@@ -503,6 +560,25 @@ class DatabaseService {
       'userId': userId,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Notify the post author.
+    try {
+      final post = await _db
+          .collection('posts')
+          .doc(postId)
+          .get();
+
+      final recipientId =
+          (post.data()?['userId'] ?? '').toString();
+
+      await NotificationService().like(
+        actorId: userId,
+        recipientId: recipientId,
+        postId: postId,
+      );
+    } catch (_) {
+      // The like remains saved.
+    }
   }
 
   Future<void> unlikePost({
@@ -539,7 +615,8 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Save a post to the signed-in user's collection.
+  // SAVED POSTS
+
   Future<void> savePost({
     required String userId,
     required String postId,
@@ -555,7 +632,6 @@ class DatabaseService {
     });
   }
 
-  // Remove a saved post.
   Future<void> unsavePost({
     required String userId,
     required String postId,
@@ -568,7 +644,6 @@ class DatabaseService {
         .delete();
   }
 
-  // Check whether a post is already saved.
   Stream<DocumentSnapshot<Map<String, dynamic>>> getSaveStatus({
     required String userId,
     required String postId,
@@ -581,8 +656,6 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Load all saved posts for the user's profile,
-  // starting with the most recently saved.
   Stream<QuerySnapshot<Map<String, dynamic>>> getSavedPosts(
     String userId,
   ) {
@@ -594,8 +667,8 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Doc ID is the Perenual species ID,
-  // so a species cannot be added twice.
+  // MY PLANTS
+
   Future<void> addMyPlant({
     required String userId,
     required MyPlant plant,
@@ -620,7 +693,7 @@ class DatabaseService {
         .delete();
   }
 
-  // Record when the plant was last watered.
+  // Record the last watering date.
   Future<void> setLastWatered({
     required String userId,
     required String plantId,
@@ -638,8 +711,7 @@ class DatabaseService {
     });
   }
 
-  // Set how often the plant should be watered.
-  // Null clears the watering schedule.
+  // Change the plant's watering schedule.
   Future<void> setWaterEveryDays({
     required String userId,
     required String plantId,
@@ -650,10 +722,11 @@ class DatabaseService {
         .doc(userId)
         .collection('myPlants')
         .doc(plantId)
-        .update({'waterEveryDays': days});
+        .update({
+      'waterEveryDays': days,
+    });
   }
 
-  // Stream all plants belonging to the user.
   Stream<List<MyPlant>> getMyPlants(
     String userId,
   ) {
@@ -675,7 +748,6 @@ class DatabaseService {
         );
   }
 
-  // Check whether a plant is already in My Plants.
   Stream<bool> isInMyPlants({
     required String userId,
     required int perenualId,
@@ -689,6 +761,8 @@ class DatabaseService {
         .map((doc) => doc.exists);
   }
 
+  // PLANT HEALTH ANALYSES
+
   Future<void> addPlantAnalysis({
     required String userId,
     required String plantId,
@@ -700,7 +774,7 @@ class DatabaseService {
     required List<String> recommendedCare,
     String? imageUrl,
   }) async {
-    await _db
+    final createdAnalysis = await _db
         .collection('users')
         .doc(userId)
         .collection('myPlants')
@@ -716,6 +790,17 @@ class DatabaseService {
       'imageUrl': imageUrl,
       'analyzedAt': FieldValue.serverTimestamp(),
     });
+
+    // Notify the owner that an analysis was saved.
+    try {
+      await NotificationService().analysis(
+        userId: userId,
+        plantId: plantId,
+        analysisId: createdAnalysis.id,
+      );
+    } catch (_) {
+      // The analysis is already saved.
+    }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> getPlantAnalyses({
@@ -731,6 +816,8 @@ class DatabaseService {
         .orderBy('analyzedAt', descending: true)
         .snapshots();
   }
+
+  // OTHER PLANT METHODS
 
   Future<void> addPlant({
     required String userID,
