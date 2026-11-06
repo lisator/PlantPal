@@ -134,30 +134,64 @@ class _AnalysisCard extends StatelessWidget {
       children: [
         if (imageUrl != null) ...[
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.network(
-              imageUrl,
-              width: double.infinity,
-              height: 155,
-              fit: BoxFit.cover,
-              errorBuilder: (
+
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
                 context,
-                error,
-                stackTrace,
-              ) {
-                return Container(
-                  height: 155,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer,
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.local_florist,
-                    size: 50,
+                MaterialPageRoute(
+                  builder: (context) => _FullScreenImage(
+                    imageUrl: imageUrl,
                   ),
-                );
-              },
+                ),
+              );
+            },
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: 155,
+                    fit: BoxFit.cover,
+                    errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                    ) {
+                      return Container(
+                        height: 155,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primaryContainer,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.local_florist,
+                          size: 50,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.zoom_in,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -272,47 +306,7 @@ class _AnalysisCard extends StatelessWidget {
       ],
     );
 
-    if (isLatest) {
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE4F3DF),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Latest Analysis',
-                  style: TextStyle(
-                    color: Color(0xFF315D3A),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Text(
-                dateText,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-
-              details,
-            ],
-          ),
-        ),
-      );
-    }
-
+   
     return Card(
       margin: EdgeInsets.zero,
       child: ExpansionTile(
@@ -326,13 +320,42 @@ class _AnalysisCard extends StatelessWidget {
           16,
           16,
         ),
-        title: Text(
-          dateText,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                dateText,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            if (isLatest)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE4F3DF),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Latest',
+                  style: TextStyle(
+                    color: Color(0xFF315D3A),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+          ],
         ),
+
         subtitle: Text(status),
+
         leading: Icon(
           healthy
               ? Icons.check_circle_outline
@@ -341,6 +364,7 @@ class _AnalysisCard extends StatelessWidget {
               ? const Color(0xFF3B7D44)
               : Colors.orange.shade800,
         ),
+
         children: [
           details,
         ],
@@ -348,6 +372,50 @@ class _AnalysisCard extends StatelessWidget {
     );
   }
 }
+
+  class _FullScreenImage extends StatelessWidget {
+      const _FullScreenImage({
+        required this.imageUrl,
+      });
+
+      final String imageUrl;
+
+      @override
+      Widget build(BuildContext context) {
+        return Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: const Text('Health Analysis Photo'),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 1,
+              maxScale: 4,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (
+                  context,
+                  error,
+                  stackTrace,
+                ) {
+                  return const Center(
+                    child: Text(
+                      'Unable to load image.',
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      }
+    }
 class _MessageCard extends StatelessWidget {
   const _MessageCard({
     required this.message,
