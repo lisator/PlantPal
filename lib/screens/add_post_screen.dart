@@ -1,4 +1,3 @@
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,32 +14,28 @@ class AddPostScreen extends StatefulWidget {
 }
 
 class _AddPostScreenState extends State<AddPostScreen> {
-  final TextEditingController _titleController =
-      TextEditingController();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _databaseService = DatabaseService();
+  final _cloudinaryService = CloudinaryService();
+  final _imagePicker = ImagePicker();
 
-  final TextEditingController _descriptionController =
-      TextEditingController();
-
-  final DatabaseService _databaseService = DatabaseService();
-  final CloudinaryService _cloudinaryService =
-      CloudinaryService();
-  final ImagePicker _imagePicker = ImagePicker();
-
-  // Store up to five selected pictures.
   final List<XFile> _selectedImages = [];
 
   bool _isPosting = false;
   bool _isSelectingImage = false;
+  bool _showPhotoTips = true;
 
   static const int _maxPhotos = 5;
   static const int _maxImageBytes = 10 * 1024 * 1024;
 
-  // PlantPal colors.
   static const Color _forest = Color(0xFF315F43);
   static const Color _sage = Color(0xFF83AD8A);
   static const Color _pale = Color(0xFFF6F8F2);
   static const Color _mint = Color(0xFFE0EBDD);
   static const Color _ink = Color(0xFF24372A);
+
+  bool get _busy => _isPosting || _isSelectingImage;
 
   @override
   void dispose() {
@@ -49,65 +44,47 @@ class _AddPostScreenState extends State<AddPostScreen> {
     super.dispose();
   }
 
-  // Show a message to the user.
   void _showMessage(String message) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
-  // Check that a picture is not too large.
+  // Check file size and basic image format.
+  // We never reject a photo for its lighting or subject.
   Future<bool> _validateImage(XFile image) async {
     try {
       final size = await image.length();
 
-      if (size == 0) {
-        _showMessage('This picture is empty.');
-        return false;
-      }
-
-      if (size > _maxImageBytes) {
+      if (size == 0 || size > _maxImageBytes) {
         _showMessage(
-          'Each picture must be 10 MB or smaller.',
+          'Each picture must be larger than 0 bytes '
+          'and no more than 10 MB.',
         );
         return false;
       }
 
-      final extension =
-          image.name.split('.').last.toLowerCase();
+      final extension = image.name.split('.').last.toLowerCase();
 
-      const allowed = {
-        'jpg',
-        'jpeg',
-        'png',
-        'heic',
-        'heif',
-        'webp',
-      };
+      const allowed = {'jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'};
 
       if (!allowed.contains(extension)) {
-        _showMessage(
-          'Please choose a JPG, PNG, HEIC, HEIF, or WebP picture.',
-        );
+        _showMessage('Choose a JPG, PNG, HEIC, HEIF, or WebP picture.');
         return false;
       }
 
       return true;
     } catch (e) {
-      _showMessage('Unable to check the selected picture.');
+      _showMessage('Unable to check this picture: $e');
       return false;
     }
   }
 
-  // Add selected pictures without exceeding five.
+  // Add photos to the existing selection.
   Future<void> _addSelectedImages(List<XFile> images) async {
-    int added = 0;
-    int skipped = 0;
+    var added = 0;
+    var skipped = 0;
 
     for (final image in images) {
       if (!mounted) return;
@@ -117,22 +94,17 @@ class _AddPostScreenState extends State<AddPostScreen> {
         continue;
       }
 
-      // Avoid adding the same selected file twice.
-      final alreadySelected = _selectedImages.any(
-        (selected) => selected.path == image.path,
-      );
-
-      if (alreadySelected) {
+      if (_selectedImages.any((selected) => selected.path == image.path)) {
         skipped++;
         continue;
       }
 
-      final valid = await _validateImage(image);
-
-      if (!valid || !mounted) {
+      if (!await _validateImage(image)) {
         skipped++;
         continue;
       }
+
+      if (!mounted) return;
 
       setState(() {
         _selectedImages.add(image);
@@ -143,24 +115,22 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
     if (skipped > 0) {
       _showMessage(
-        'Added $added photo(s). Some pictures were skipped. '
-        'You can add up to 5 valid pictures.',
+        'Added $added picture(s). Some were skipped. '
+        'You can use up to 5 pictures.',
       );
     }
   }
 
-  // Select multiple pictures from the gallery.
+  // Choose multiple photos from the gallery.
   Future<void> _pickImageFromGallery() async {
-    if (_isPosting || _isSelectingImage) return;
+    if (_busy) return;
 
     if (_selectedImages.length >= _maxPhotos) {
-      _showMessage('You can add up to 5 pictures per post.');
+      _showMessage('You already have 5 pictures.');
       return;
     }
 
-    setState(() {
-      _isSelectingImage = true;
-    });
+    setState(() => _isSelectingImage = true);
 
     try {
       final images = await _imagePicker.pickMultiImage(
@@ -175,57 +145,128 @@ class _AddPostScreenState extends State<AddPostScreen> {
       _showMessage('Unable to select pictures: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _isSelectingImage = false;
-        });
+        setState(() => _isSelectingImage = false);
       }
     }
   }
 
-  // Take one picture using the device camera.
+  // Show a preview after taking a photo.
+  // The user can accept it, retake it, or cancel.
+  Future<String?> _reviewCapturedPhoto(XFile image) async {
+    final bytes = await image.readAsBytes();
+
+    if (!mounted) return null;
+
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('How does your picture look?'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 340),
+                  child: InteractiveViewer(
+                    maxScale: 4,
+                    child: Image.memory(
+                      bytes,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) {
+                        return const Text('Unable to display the preview.');
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'You can use this picture even if '
+                  'the lighting is not perfect.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _ink, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, 'cancel'),
+              child: const Text('Cancel'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, 'retake'),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retake'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, 'use'),
+              icon: const Icon(Icons.check),
+              label: const Text('Use Photo'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Take photos using the Community camera flow.
   Future<void> _takePhoto() async {
-    if (_isPosting || _isSelectingImage) return;
+    if (_busy) return;
 
     if (_selectedImages.length >= _maxPhotos) {
       _showMessage('You can add up to 5 pictures per post.');
       return;
     }
 
-    if (kIsWeb) {
-      _showMessage(
-        'Camera capture should be tested on the mobile app.',
-      );
-      return;
-    }
-
-    setState(() {
-      _isSelectingImage = true;
-    });
+    setState(() => _isSelectingImage = true);
 
     try {
-      final image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-        maxWidth: 1600,
-      );
+      bool takingPhoto = true;
 
-      if (image == null || !mounted) return;
+      while (takingPhoto && mounted) {
+        // Mobile opens the native camera.
+        // Web support depends on the browser/device.
+        final image = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 80,
+          maxWidth: 1600,
+        );
 
-      await _addSelectedImages([image]);
+        if (!mounted || image == null) break;
+
+        if (!await _validateImage(image)) break;
+        if (!mounted) break;
+
+        final decision = await _reviewCapturedPhoto(image);
+
+        if (!mounted) break;
+
+        if (decision == 'use') {
+          await _addSelectedImages([image]);
+          takingPhoto = false;
+        } else if (decision == 'retake') {
+          // Open the camera again.
+          takingPhoto = true;
+        } else {
+          takingPhoto = false;
+        }
+      }
     } catch (e) {
-      _showMessage('Unable to open camera: $e');
+      _showMessage(
+        'Could not open the camera. '
+        'Check camera permissions or use Gallery. $e',
+      );
     } finally {
       if (mounted) {
-        setState(() {
-          _isSelectingImage = false;
-        });
+        setState(() => _isSelectingImage = false);
       }
     }
   }
 
-  // Remove one picture from the selection.
   void _removeImage(int index) {
-    if (_isPosting || _isSelectingImage) return;
+    if (_busy) return;
 
     if (index < 0 || index >= _selectedImages.length) {
       return;
@@ -236,9 +277,54 @@ class _AddPostScreenState extends State<AddPostScreen> {
     });
   }
 
-  // Upload all pictures and save the post.
+  // Open a selected picture larger for inspection.
+  Future<void> _openPhotoPreview(XFile image) async {
+    try {
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(12),
+          child: Stack(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: MediaQuery.sizeOf(dialogContext).height * 0.75,
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 5,
+                  child: Center(
+                    child: Image.memory(bytes, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black54,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      _showMessage('Could not open picture: $e');
+    }
+  }
+
+  // Upload photos to Cloudinary and save the post.
   Future<void> _createPost() async {
-    if (_isPosting || _isSelectingImage) return;
+    if (_busy) return;
 
     final title = _titleController.text.trim();
     final description = _descriptionController.text.trim();
@@ -249,59 +335,47 @@ class _AddPostScreenState extends State<AddPostScreen> {
     }
 
     if (title.length > 100) {
-      _showMessage(
-        'Title cannot be longer than 100 characters.',
-      );
+      _showMessage('Title cannot exceed 100 characters.');
       return;
     }
 
     if (description.length > 1000) {
-      _showMessage(
-        'Description cannot be longer than 1000 characters.',
-      );
+      _showMessage('Description cannot exceed 1000 characters.');
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      _showMessage('You must be logged in to create a post.');
+      _showMessage('Please sign in to create a post.');
       return;
     }
 
-    setState(() {
-      _isPosting = true;
-    });
+    setState(() => _isPosting = true);
 
     try {
-      // Store the uploaded Cloudinary URLs.
       final imageUrls = <String>[];
 
-      // Upload one picture at a time.
       for (final image in _selectedImages) {
-        final valid = await _validateImage(image);
+        if (!await _validateImage(image)) {
+          return;
+        }
 
-        if (!valid) return;
-
-        final imageUrl =
-            await _cloudinaryService.uploadImage(image);
+        final imageUrl = await _cloudinaryService.uploadImage(image);
 
         if (imageUrl.trim().isEmpty) {
-          throw StateError('A picture could not be uploaded.');
+          throw StateError('An image upload failed.');
         }
 
         imageUrls.add(imageUrl);
       }
 
-      // Save every picture with the post.
       await _databaseService.addPost(
         userId: user.uid,
         userEmail: user.email ?? '',
         title: title,
         description: description,
-        imageUrl: imageUrls.isNotEmpty
-            ? imageUrls.first
-            : '',
+        imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
         imageUrls: imageUrls,
       );
 
@@ -313,21 +387,19 @@ class _AddPostScreenState extends State<AddPostScreen> {
       _showMessage('Unable to create post: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _isPosting = false;
-        });
+        setState(() => _isPosting = false);
       }
     }
   }
 
-  // Show one selected picture with a remove button.
+  // Preview one selected photo.
   Widget _selectedPhotoCard(int index) {
     final image = _selectedImages[index];
 
     return Container(
       key: ValueKey(image.path),
-      width: 145,
-      margin: const EdgeInsets.only(right: 12),
+      width: 150,
+      margin: const EdgeInsets.only(right: 10),
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
         color: _pale,
@@ -337,111 +409,74 @@ class _AddPostScreenState extends State<AddPostScreen> {
       child: Column(
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: FutureBuilder<Uint8List>(
-                future: image.readAsBytes(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        color: _sage,
-                        size: 36,
-                      ),
-                    );
-                  }
+            child: InkWell(
+              onTap: () => _openPhotoPreview(image),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: FutureBuilder<Uint8List>(
+                  future: image.readAsBytes(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Icon(Icons.broken_image_outlined, color: _sage),
+                      );
+                    }
 
-                  if (!snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: _forest,
-                      ),
-                    );
-                  }
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: _forest),
+                      );
+                    }
 
-                  return SizedBox(
-                    width: double.infinity,
-                    child: Image.memory(
+                    return Image.memory(
                       snapshot.data!,
+                      width: double.infinity,
                       fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),
-
-          const SizedBox(height: 6),
-
+          const SizedBox(height: 5),
           Text(
             'Photo ${index + 1}',
-            style: const TextStyle(
-              color: _forest,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(color: _forest, fontWeight: FontWeight.bold),
           ),
-
           TextButton.icon(
-            onPressed: _isPosting || _isSelectingImage
-                ? null
-                : () => _removeImage(index),
-            icon: const Icon(
-              Icons.close,
-              size: 16,
-              color: _forest,
-            ),
-            label: const Text(
-              'Remove',
-              style: TextStyle(fontSize: 12),
-            ),
+            onPressed: _busy ? null : () => _removeImage(index),
+            icon: const Icon(Icons.close, size: 16),
+            label: const Text('Remove'),
           ),
         ],
       ),
     );
   }
 
-  // Preview all selected pictures.
+  // Photo previews.
   Widget _imagePreview() {
     if (_selectedImages.isEmpty) {
       return Container(
-        height: 190,
-        width: double.infinity,
+        height: 170,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: _pale,
-          border: Border.all(
-            color: _sage,
-            width: 1.5,
-          ),
-          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _sage),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.add_photo_alternate_outlined,
-              color: _forest,
-              size: 48,
-            ),
-            SizedBox(height: 12),
+            Icon(Icons.add_photo_alternate_outlined, color: _forest, size: 48),
+            SizedBox(height: 10),
             Text(
-              'Add up to 5 pictures of your plants',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _forest,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              'Add up to 5 pictures',
+              style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 5),
+            SizedBox(height: 4),
             Text(
-              'Choose pictures from your gallery or camera.',
+              'Take a photo or select from your gallery.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: _ink,
-                fontSize: 12,
-              ),
             ),
           ],
         ),
@@ -452,43 +487,73 @@ class _AddPostScreenState extends State<AddPostScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${_selectedImages.length} of $_maxPhotos pictures selected',
-          style: const TextStyle(
-            color: _forest,
-            fontWeight: FontWeight.w600,
-          ),
+          '${_selectedImages.length} of 5 photos selected',
+          style: const TextStyle(color: _forest, fontWeight: FontWeight.bold),
         ),
-
-        const SizedBox(height: 12),
-
+        const SizedBox(height: 10),
         SizedBox(
           height: 215,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _selectedImages.length,
-            itemBuilder: (context, index) {
-              return _selectedPhotoCard(index);
-            },
+            itemBuilder: (context, index) => _selectedPhotoCard(index),
           ),
         ),
-
-        const SizedBox(height: 8),
-
+        const SizedBox(height: 5),
         const Text(
-          'Swipe sideways to preview your selected pictures.',
-          style: TextStyle(
-            color: _ink,
-            fontSize: 12,
-          ),
+          'Tap a photo to enlarge it. Swipe to see more.',
+          style: TextStyle(fontSize: 12, color: _ink),
         ),
       ],
     );
   }
 
-  // Photo selection section.
+  // Optional tips; nothing is automatically rejected.
+  Widget _photoTips() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _pale,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _mint),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lightbulb_outline, color: _forest),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Optional Photo Tips',
+                  style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Hide photo tips',
+                onPressed: () {
+                  setState(() => _showPhotoTips = false);
+                },
+                icon: const Icon(Icons.close, size: 19),
+              ),
+            ],
+          ),
+          const Text(
+            '• Try moving closer to a window for more light.\n'
+            '• Hold the camera steady for a clearer picture.\n'
+            '• Tap the screen to focus if your camera supports it.\n'
+            '• You can post any picture you like, even '
+            'if the lighting is not perfect.',
+            style: TextStyle(color: _ink, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _photoSection() {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -500,13 +565,10 @@ class _AddPostScreenState extends State<AddPostScreen> {
         children: [
           const Row(
             children: [
-              Icon(
-                Icons.local_florist_outlined,
-                color: _forest,
-              ),
+              Icon(Icons.camera_alt_outlined, color: _forest),
               SizedBox(width: 8),
               Text(
-                'Plant Photos',
+                'Community Photos',
                 style: TextStyle(
                   color: _forest,
                   fontSize: 18,
@@ -515,96 +577,73 @@ class _AddPostScreenState extends State<AddPostScreen> {
               ),
             ],
           ),
-
-          const SizedBox(height: 5),
-
+          const SizedBox(height: 6),
           const Text(
-            'Share up to 5 pictures with the PlantPal Community.',
-            style: TextStyle(
-              color: _ink,
-              fontSize: 13,
-            ),
+            'Share your plants, your garden, or anything '
+            'you want to show the Community.',
+            style: TextStyle(color: _ink),
           ),
-
           const SizedBox(height: 16),
 
-          _imagePreview(),
+          if (_showPhotoTips) ...[
+            _photoTips(),
+            const SizedBox(height: 16),
+          ] else ...[
+            TextButton.icon(
+              onPressed: () {
+                setState(() => _showPhotoTips = true);
+              },
+              icon: const Icon(Icons.lightbulb_outline),
+              label: const Text('Show Photo Tips'),
+            ),
+          ],
 
+          _imagePreview(),
           const SizedBox(height: 12),
 
           const Text(
-            'Maximum: 5 pictures, 10 MB each.',
-            style: TextStyle(
-              color: _ink,
-              fontSize: 12,
-            ),
+            'Up to 5 pictures, 10 MB each. Photos are optional.',
+            style: TextStyle(fontSize: 12, color: _ink),
           ),
-
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _isPosting || _isSelectingImage
-                      ? null
-                      : _pickImageFromGallery,
-                  icon: const Icon(
-                    Icons.photo_library_outlined,
-                  ),
+                  onPressed: _busy ? null : _pickImageFromGallery,
+                  icon: const Icon(Icons.photo_library_outlined),
                   label: const Text('Gallery'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _forest,
-                    side: const BorderSide(color: _sage),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 13,
-                    ),
-                  ),
                 ),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isPosting || _isSelectingImage
-                      ? null
-                      : _takePhoto,
-                  icon: const Icon(
-                    Icons.camera_alt_outlined,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _takePhoto,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _forest,
+                    foregroundColor: Colors.white,
                   ),
+                  icon: const Icon(Icons.camera_alt_outlined),
                   label: const Text('Camera'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _forest,
-                    side: const BorderSide(color: _sage),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 13,
-                    ),
-                  ),
                 ),
               ),
             ],
           ),
 
-          if (_isSelectingImage) ...[
-            const SizedBox(height: 12),
-            const Center(
-              child: CircularProgressIndicator(
-                color: _forest,
-              ),
-            ),
-          ],
-
           if (kIsWeb) ...[
             const SizedBox(height: 10),
             const Text(
-              'Camera capture is available on mobile devices.',
+              'On Chrome, the Camera button may open a '
+              'file picker depending on browser support.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: _ink,
-              ),
+              style: TextStyle(fontSize: 12, color: _ink),
             ),
+          ],
+
+          if (_isSelectingImage) ...[
+            const SizedBox(height: 12),
+            const Center(child: CircularProgressIndicator(color: _forest)),
           ],
         ],
       ),
@@ -615,34 +654,19 @@ class _AddPostScreenState extends State<AddPostScreen> {
   Widget build(BuildContext context) {
     return Theme(
       data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _forest,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: _forest),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
-          labelStyle: const TextStyle(
-            color: _forest,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _sage),
-          ),
+          labelStyle: const TextStyle(color: _forest),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: const BorderSide(color: _mint),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: _forest,
-              width: 2,
-            ),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: _forest,
+            borderSide: const BorderSide(color: _forest, width: 2),
           ),
         ),
       ),
@@ -651,28 +675,19 @@ class _AddPostScreenState extends State<AddPostScreen> {
         appBar: AppBar(
           title: const Text(
             'Create Post',
-            style: TextStyle(
-              color: _forest,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
           backgroundColor: _pale,
-          surfaceTintColor: _pale,
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 700,
-            ),
+            constraints: const BoxConstraints(maxWidth: 700),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                16, 18, 16, 30,
-              ),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Welcome section.
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -680,18 +695,12 @@ class _AddPostScreenState extends State<AddPostScreen> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.spa_outlined,
-                          color: _forest,
-                          size: 30,
-                        ),
+                        Icon(Icons.spa_outlined, color: _forest, size: 30),
                         SizedBox(width: 12),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Share with PlantPal!',
@@ -703,12 +712,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
                               ),
                               SizedBox(height: 6),
                               Text(
-                                'Show off your plants, share a growing '
-                                'tip, or ask the community a question.',
-                                style: TextStyle(
-                                  color: _ink,
-                                  fontSize: 13,
-                                ),
+                                'Share a picture, a growing tip, '
+                                'or a question with the Community.',
+                                style: TextStyle(color: _ink),
                               ),
                             ],
                           ),
@@ -719,7 +725,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
                   const SizedBox(height: 18),
 
-                  // Post details.
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
@@ -738,39 +743,26 @@ class _AddPostScreenState extends State<AddPostScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
-                        const SizedBox(height: 16),
-
+                        const SizedBox(height: 14),
                         TextField(
                           controller: _titleController,
                           enabled: !_isPosting,
                           maxLength: 100,
-                          textCapitalization:
-                              TextCapitalization.sentences,
+                          textCapitalization: TextCapitalization.sentences,
                           decoration: const InputDecoration(
                             labelText: 'Post Title',
-                            hintText:
-                                'Example: Help with my Monstera',
-                            prefixIcon: Icon(
-                              Icons.edit_note_outlined,
-                              color: _forest,
-                            ),
+                            hintText: 'What would you like to share?',
                           ),
                         ),
-
                         const SizedBox(height: 12),
-
                         TextField(
                           controller: _descriptionController,
                           enabled: !_isPosting,
                           maxLength: 1000,
                           maxLines: 5,
-                          textCapitalization:
-                              TextCapitalization.sentences,
                           decoration: const InputDecoration(
                             labelText: 'Description',
-                            hintText:
-                                'Tell the community about your plant...',
+                            hintText: 'Tell the Community about your post...',
                             alignLabelWithHint: true,
                           ),
                         ),
@@ -779,78 +771,38 @@ class _AddPostScreenState extends State<AddPostScreen> {
                   ),
 
                   const SizedBox(height: 18),
-
-                  // Select and preview pictures.
                   _photoSection(),
-
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 20),
 
                   if (_isPosting) ...[
                     const Center(
-                      child: CircularProgressIndicator(
-                        color: _forest,
-                      ),
+                      child: CircularProgressIndicator(color: _forest),
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'Uploading pictures and sharing your post...',
+                      'Uploading photos and sharing your post...',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: _forest),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                   ],
 
-                  // Share Post button.
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _isPosting || _isSelectingImage
-                          ? null
-                          : _createPost,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _forest,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: _isPosting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.send_outlined),
-                      label: Text(
-                        _isPosting ? 'Posting...' : 'Share Post',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _createPost,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _forest,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    icon: const Icon(Icons.send_outlined),
+                    label: Text(
+                      _isPosting ? 'Posting...' : 'Share Post',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // Cancel button.
+                  const SizedBox(height: 10),
                   OutlinedButton(
-                    onPressed: _isPosting || _isSelectingImage
-                        ? null
-                        : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _forest,
-                      side: const BorderSide(color: _sage),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                      ),
-                    ),
+                    onPressed: _busy ? null : () => Navigator.pop(context),
                     child: const Text('Cancel'),
                   ),
                 ],
