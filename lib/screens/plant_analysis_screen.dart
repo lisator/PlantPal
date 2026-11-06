@@ -9,6 +9,7 @@ import '../models/my_plant.dart';
 import '../services/cloudinary_service.dart';
 import '../services/database_service.dart';
 import 'home_screen.dart';
+import 'plant_camera_screen.dart';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -123,6 +124,40 @@ class _UploadScreenState extends State<UploadScreen> {
       _clearResults();
     });
   }
+  
+  Future<void> _openPlantCamera() async {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can select up to 5 images.'),
+        ),
+      );
+      return;
+    }
+
+    final XFile? image = await Navigator.push<XFile>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PlantCameraScreen(),
+      ),
+    );
+
+    if (image == null) {
+      return;
+    }
+
+    final bytes = await image.readAsBytes();
+
+    if (!mounted) return;
+
+    setState(() {
+      _selectedImages.add(image);
+      _imageBytesList.add(bytes);
+
+      _clearResults();
+    });
+  }
+
   Future<void> _analyzePlant() async {
     if (_imageBytesList.isEmpty) {
   return;
@@ -147,6 +182,7 @@ class _UploadScreenState extends State<UploadScreen> {
       final response = await plantApi.identifyPlant(
         imageBytesList: _imageBytesList,
       );
+
 
       // -----------------------------
       // PLANT IDENTIFICATION
@@ -601,8 +637,7 @@ Future<void> _saveToExistingPlant() async {
               // TAKE PICTURE
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () =>
-                      _pickImage(ImageSource.camera),
+                  onPressed: _openPlantCamera,
                   icon: const Icon(
                     Icons.camera_alt_outlined,
                   ),
