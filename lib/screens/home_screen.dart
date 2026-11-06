@@ -14,6 +14,41 @@ import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
 import 'profile_screen.dart';
 
+// PlantPal colors, same palette as the community screen.
+const Color _forest = Color(0xFF315F43);
+const Color _sage = Color(0xFF83AD8A);
+const Color _pale = Color(0xFFF6F8F2);
+const Color _mint = Color(0xFFE0EBDD);
+const Color _ink = Color(0xFF24372A);
+
+// Rounded card with a mint border and soft shadow, like the community posts.
+const RoundedRectangleBorder _cardShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(20)),
+  side: BorderSide(color: _mint),
+);
+final Color _cardShadow = _forest.withValues(alpha: 0.12);
+
+// Forest buttons, spinners, and text fields instead of Flutter's default
+// purple, like the community screen's own theme.
+ThemeData _screenTheme(ThemeData base) => base.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _forest,
+        primary: _forest,
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: _forest),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _forest,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(foregroundColor: _forest),
+      ),
+    );
+
 /// Bottom tab indexes in HomeScreen, plus a way for pushed pages
 /// (e.g. plant details) to jump to a tab.
 class HomeTabs {
@@ -107,8 +142,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PlantPal'),
+        title: const Text(
+          'PlantPal',
+          style: TextStyle(
+            color: _forest,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: _pale,
+        surfaceTintColor: _pale,
+        foregroundColor: _forest,
       ),
 
       drawer: AppDrawer(
@@ -127,6 +171,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _selectedIndex,
         type:
             BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: _forest,
+        unselectedItemColor: _sage,
 
         onTap: _selectBottomTab,
 
@@ -210,12 +257,31 @@ class _DashboardScreenState
             ? 'Good afternoon'
             : 'Good evening';
 
+    final greetingStyle = textTheme.headlineSmall?.copyWith(
+      color: _pale,
+      fontWeight: FontWeight.w700,
+    );
+    final summaryStyle = textTheme.bodyMedium?.copyWith(
+      color: _mint,
+    );
+
+    // forest green banner behind the greeting and summary
+    Widget banner(Widget child) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: _forest,
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+          child: child,
+        );
+
     // signed out: just the greeting, no name or summary
     if (_userId == null) {
-      return Text(greeting, style: textTheme.headlineSmall);
+      return banner(Text(greeting, style: greetingStyle));
     }
 
-    return Column(
+    return banner(Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -231,7 +297,7 @@ class _DashboardScreenState
                 );
             return Text(
               name.isEmpty ? greeting : '$greeting, $name',
-              style: textTheme.headlineSmall,
+              style: greetingStyle,
             );
           },
         ),
@@ -246,12 +312,12 @@ class _DashboardScreenState
             }
             return Text(
               plantSummary(plants),
-              style: textTheme.bodyMedium,
+              style: summaryStyle,
             );
           },
         ),
       ],
-    );
+    ));
   }
 
   /// The 3 newest community posts; tapping one opens the Community tab.
@@ -285,7 +351,12 @@ class _DashboardScreenState
         if (posts.isEmpty) {
           return Card(
             margin: EdgeInsets.zero,
+            color: Colors.white,
+            elevation: 1,
+            shadowColor: _cardShadow,
+            shape: _cardShape,
             child: ListTile(
+              iconColor: _forest,
               leading: const Icon(Icons.forum_outlined),
               title: const Text('No posts yet'),
               subtitle: const Text('Be the first to share in Community.'),
@@ -341,7 +412,12 @@ class _DashboardScreenState
         if (plants.isEmpty) {
           return Card(
             margin: EdgeInsets.zero,
+            color: Colors.white,
+            elevation: 1,
+            shadowColor: _cardShadow,
+            shape: _cardShape,
             child: ListTile(
+              iconColor: _forest,
               leading: const Icon(
                 Icons.local_florist_outlined,
               ),
@@ -423,7 +499,11 @@ class _DashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    return Theme(
+      data: _screenTheme(Theme.of(context)),
+      child: ColoredBox(
+      color: _pale,
+      child: ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _buildGreeting(context),
@@ -433,7 +513,11 @@ class _DashboardScreenState
         ),
 
         Card(
-          elevation: 2,
+          margin: EdgeInsets.zero,
+          color: Colors.white,
+          elevation: 1,
+          shadowColor: _cardShadow,
+          shape: _cardShape,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -446,6 +530,7 @@ class _DashboardScreenState
                     fontSize: 22,
                     fontWeight:
                         FontWeight.bold,
+                    color: _ink,
                   ),
                 ),
 
@@ -471,9 +556,16 @@ class _DashboardScreenState
               'Saved plants',
               style: Theme.of(context)
                   .textTheme
-                  .titleLarge,
+                  .titleLarge
+                  ?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: _forest,
+              ),
               onPressed:
                   widget.onViewAllPlants,
               child:
@@ -500,9 +592,16 @@ class _DashboardScreenState
               'Community',
               style: Theme.of(context)
                   .textTheme
-                  .titleLarge,
+                  .titleLarge
+                  ?.copyWith(
+                    color: _ink,
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: _forest,
+              ),
               onPressed: () => HomeTabs.goTo(
                 context,
                 HomeTabs.community,
@@ -519,6 +618,8 @@ class _DashboardScreenState
 
         _buildRecentPosts(context),
       ],
+      ),
+      ),
     );
   }
 }
@@ -556,7 +657,7 @@ class _RecentPostTileState extends State<_RecentPostTile> {
     const placeholder = SizedBox(
       width: 48,
       height: 48,
-      child: Icon(Icons.forum_outlined),
+      child: Icon(Icons.forum_outlined, color: _forest),
     );
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -587,8 +688,13 @@ class _RecentPostTileState extends State<_RecentPostTile> {
   }) {
     return Card(
       margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 1,
+      shadowColor: _cardShadow,
+      shape: _cardShape,
       child: ListTile(
         onTap: widget.onTap,
+        iconColor: _forest,
         leading: imageUrl.isEmpty
             ? placeholder
             : ClipRRect(
@@ -605,6 +711,10 @@ class _RecentPostTileState extends State<_RecentPostTile> {
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: _ink,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         subtitle: Text(
           [
