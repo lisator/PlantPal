@@ -9,12 +9,47 @@ import '../widgets/watering.dart';
 import 'home_screen.dart';
 import '../widgets/health_history.dart';
 
+// PlantPal colors, same palette as the community screen.
+const Color _forest = Color(0xFF315F43);
+const Color _pale = Color(0xFFF6F8F2);
+const Color _mint = Color(0xFFE0EBDD);
+const Color _ink = Color(0xFF24372A);
+
+// Forest buttons, icons, spinners, and care guide accents instead of
+// Flutter's default purple. Only wraps this page, so the analysis pages that
+// also show the care guide keep their own look.
+ThemeData _screenTheme(ThemeData base) => base.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _forest,
+        primary: _forest,
+        outlineVariant: _mint,
+      ),
+      scaffoldBackgroundColor: _pale,
+      dividerTheme: const DividerThemeData(color: _mint),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: _forest),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _forest,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _forest,
+          side: const BorderSide(color: _forest),
+        ),
+      ),
+    );
+
 /// Opens the care page for a Perenual plant (from search or My Plants).
 // collapseCare: true when opened from my plants (sections start collapsed)
 void openPlantDetailsPage(
   BuildContext context,
   PlantSearchResult plant, {
   bool collapseCare = false,
+  bool fromMyPlants = false,
 }) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
@@ -22,6 +57,7 @@ void openPlantDetailsPage(
         plantId: plant.id,
         preview: plant,
         collapseCare: collapseCare,
+        fromMyPlants: fromMyPlants,
       ),
     ),
   );
@@ -39,13 +75,18 @@ class PlantDetailsScreen extends StatefulWidget {
     required this.plantId,
     this.preview,
     this.collapseCare = false,
+    this.fromMyPlants = false,
   });
 
   final int plantId;
   final PlantSearchResult? preview;
 
-  // collapse about and care guide (my plants), or show everything (search)
+  // collapse about and care guide (my plants and search), or show everything
   final bool collapseCare;
+
+  // true when opened from my plants: shows the plant's health history
+  // (search also collapses care info, but isn't a saved plant)
+  final bool fromMyPlants;
 
   @override
   State<PlantDetailsScreen> createState() => _PlantDetailsScreenState();
@@ -88,8 +129,24 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   // Header shows right away; below it is a spinner, an error, or the care info.
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Plant care')),
+    // health history keeps the app's default look, not this page's colors
+    final healthHistoryTheme = Theme.of(context);
+
+    return Theme(
+      data: _screenTheme(Theme.of(context)),
+      child: Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Plant care',
+          style: TextStyle(
+            color: _forest,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: _pale,
+        surfaceTintColor: _pale,
+        foregroundColor: _forest,
+      ),
       body: FutureBuilder<PlantDetails>(
         future: _details,
         builder: (context, snapshot) {
@@ -146,13 +203,16 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                       collapsible: widget.collapseCare,
                     ),
 
-                    if (widget.collapseCare) ...[
+                    if (widget.fromMyPlants && currentUserId() != null) ...[
                       const SizedBox(height: 28),
 
-                      HealthHistory(
-                        userId: currentUserId()!,
-                        plantId: '${details.id}',
-                      )
+                      Theme(
+                        data: healthHistoryTheme,
+                        child: HealthHistory(
+                          userId: currentUserId()!,
+                          plantId: '${details.id}',
+                        ),
+                      ),
                     ]
                   ],
                 ],
@@ -160,6 +220,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }
@@ -182,12 +243,17 @@ class _PlantHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
 
     final info = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(name, style: textTheme.headlineSmall),
+        Text(
+          name,
+          style: textTheme.headlineSmall?.copyWith(
+            color: _ink,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         if (scientificName.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
@@ -204,9 +270,18 @@ class _PlantHeader extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
+      // white card with a mint border, like the community posts
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _mint),
+        boxShadow: [
+          BoxShadow(
+            color: _forest.withValues(alpha: 0.12),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {

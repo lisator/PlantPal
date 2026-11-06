@@ -7,6 +7,27 @@ import '../widgets/plant_care_guide.dart';
 import 'home_screen.dart';
 import '../widgets/health_history.dart';
 
+// PlantPal colors, same palette as the community screen. Used for the app
+// bar, header, plant info, and care guide; Health History keeps its own look.
+const Color _forest = Color(0xFF315F43);
+const Color _pale = Color(0xFFF6F8F2);
+const Color _mint = Color(0xFFE0EBDD);
+const Color _ink = Color(0xFF24372A);
+
+// Forest icons, buttons, spinners, and care guide accents instead of
+// Flutter's default purple.
+ThemeData _screenTheme(ThemeData base) => base.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _forest,
+        primary: _forest,
+        outlineVariant: _mint,
+      ),
+      dividerTheme: const DividerThemeData(color: _mint),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: _forest),
+      ),
+    );
+
 class AnalysisPlantDetailsScreen extends StatelessWidget {
   const AnalysisPlantDetailsScreen({
     super.key,
@@ -20,8 +41,18 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
     final userId = currentUserId();
 
     return Scaffold(
+      backgroundColor: _pale,
       appBar: AppBar(
-        title: const Text('Plant care'),
+        title: const Text(
+          'Plant care',
+          style: TextStyle(
+            color: _forest,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: _pale,
+        surfaceTintColor: _pale,
+        foregroundColor: _forest,
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -30,15 +61,24 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              _PlantHeader(plant: plant),
+              // header, plant info, and care guide in PlantPal colors
+              Theme(
+                data: _screenTheme(Theme.of(context)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _PlantHeader(plant: plant),
 
-              const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-              _PlantInformation(plant: plant),
+                    _PlantInformation(plant: plant),
 
-              const SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
-              _AnalysisCareGuide(plant: plant),
+                    _AnalysisCareGuide(plant: plant),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 28),
 
@@ -72,9 +112,18 @@ class _PlantHeader extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
+      // white card with a mint border, like the community posts
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _mint),
+        boxShadow: [
+          BoxShadow(
+            color: _forest.withValues(alpha: 0.12),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +158,10 @@ class _PlantHeader extends StatelessWidget {
 
           Text(
             plant.displayName,
-            style: Theme.of(context).textTheme.headlineMedium,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: _ink,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
 
           if (plant.nickname != null) ...[
@@ -149,7 +201,10 @@ class _PlantInformation extends StatelessWidget {
       children: [
         Text(
           'My Plant',
-          style: Theme.of(context).textTheme.headlineSmall,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: _ink,
+                fontWeight: FontWeight.w700,
+              ),
         ),
 
         const SizedBox(height: 12),

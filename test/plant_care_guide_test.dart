@@ -53,6 +53,44 @@ void main() {
     expect(find.text('It needs well-drained soil.'), findsOneWidget);
   });
 
+  testWidgets('shows a Wikipedia excerpt once when topics share it',
+      (tester) async {
+    const noCareDetails = PlantDetails(
+      id: 2,
+      commonName: 'Pink princess',
+      scientificName: 'Philodendron erubescens',
+    );
+    const shared = CareExcerpt(
+      text: 'Keep it in bright, indirect light and water when the soil is dry.',
+      article: article,
+    );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: PlantCareGuide(
+            details: noCareDetails,
+            wikipedia: Future.value((
+              article: article,
+              care: {
+                CareTopic.water: shared,
+                CareTopic.light: shared,
+                CareTopic.soil: const CareExcerpt(
+                  text: 'It needs well-drained soil.',
+                  article: article,
+                ),
+              },
+            )),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    expect(find.text(shared.text), findsOneWidget);
+    expect(find.text('Water & Light'), findsOneWidget);
+    expect(find.text('Soil'), findsOneWidget);
+  });
+
   testWidgets('says when neither source has a topic', (tester) async {
     await tester.pumpWidget(page(Future.value(noWikipediaExtras)));
     await tester.pump();

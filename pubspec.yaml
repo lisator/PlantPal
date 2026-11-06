@@ -46,6 +46,7 @@ dependencies:
   url_launcher: ^6.3.3
   firebase_ai: ^4.0.0
   camera: ^0.12.2
+  firebase_app_check: ^0.4.8
 
 dev_dependencies:
   flutter_test:

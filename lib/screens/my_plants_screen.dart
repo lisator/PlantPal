@@ -9,6 +9,40 @@ import '../widgets/plant_care_guide.dart';
 
 import 'analysis_plant_details_screen.dart';
 
+// PlantPal colors, same palette as the community screen.
+const Color _forest = Color(0xFF315F43);
+const Color _pale = Color(0xFFF6F8F2);
+const Color _mint = Color(0xFFE0EBDD);
+const Color _ink = Color(0xFF24372A);
+
+// Rounded card with a mint border and soft shadow, like the community posts.
+const RoundedRectangleBorder _cardShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(20)),
+  side: BorderSide(color: _mint),
+);
+final Color _cardShadow = _forest.withValues(alpha: 0.12);
+
+// Forest buttons, spinners, and text fields instead of Flutter's default
+// purple, like the community screen's own theme.
+ThemeData _screenTheme(ThemeData base) => base.copyWith(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: _forest,
+        primary: _forest,
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: _forest),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _forest,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(foregroundColor: _forest),
+      ),
+    );
+
 /// Plants from search open the Perenual care page; plants saved from a photo
 /// analysis (no Perenual id) open the analysis details page.
 void openMyPlantDetails(BuildContext context, MyPlant plant) {
@@ -17,6 +51,7 @@ void openMyPlantDetails(BuildContext context, MyPlant plant) {
       context,
       plant.toSearchResult(),
       collapseCare: true,
+      fromMyPlants: true,
     );
     return;
   }
@@ -94,7 +129,11 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
     final userId = _userId;
 
     // States: signed out, error, loading, empty, or the list.
-    return Align(
+    return Theme(
+      data: _screenTheme(Theme.of(context)),
+      child: ColoredBox(
+      color: _pale,
+      child: Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
@@ -127,6 +166,10 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                       message: 'Search for a plant and tap "Add to My Plants" '
                           'to keep its care info here.',
                       action: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _forest,
+                          foregroundColor: Colors.white,
+                        ),
                         onPressed: () =>
                             HomeTabs.goTo(context, HomeTabs.search),
                         icon: const Icon(Icons.search),
@@ -148,8 +191,13 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                           children: [
                             Text(
                               'My Plants',
-                              style:
-                                  Theme.of(context).textTheme.headlineSmall,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    color: _ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -181,6 +229,8 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                 },
               ),
       ),
+      ),
+      ),
     );
   }
 }
@@ -207,7 +257,6 @@ class MyPlantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
     final daysUntilWatering = plant.daysUntilWatering();
     final subtitle =
         plant.nickname != null ? plant.commonName : plant.scientificName;
@@ -216,9 +265,14 @@ class MyPlantCard extends StatelessWidget {
       width: compact ? 248 : null,
       child: Card(
         margin: EdgeInsets.zero,
+        color: Colors.white,
+        elevation: 1,
+        shadowColor: _cardShadow,
+        shape: _cardShape,
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: EdgeInsets.all(compact ? 14 : 16),
             child: Row(
@@ -242,7 +296,10 @@ class MyPlantCard extends StatelessWidget {
                         plant.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium,
+                        style: textTheme.titleMedium?.copyWith(
+                          color: _ink,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       if (subtitle.isNotEmpty)
                         Text(
@@ -267,25 +324,23 @@ class MyPlantCard extends StatelessWidget {
                           ),
                         ],
                         const SizedBox(height: 4),
-                        const Divider(height: 16),
+                        const Divider(height: 16, color: _mint),
                         // Watering status, "Watered" button, and schedule.
                         const SizedBox(height: 4),
                         Wrap(
                           spacing: 8,
+                          runSpacing: 4,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text(
-                              wateringStatus(plant),
-                              style: daysUntilWatering != null &&
-                                      daysUntilWatering <= 0
-                                  ? textTheme.bodyMedium?.copyWith(
-                                      color: colors.error,
-                                      fontWeight: FontWeight.bold,
-                                    )
-                                  : textTheme.bodyMedium,
+                            _WateringBadge(
+                              text: wateringStatus(plant),
+                              daysUntilWatering: daysUntilWatering,
                             ),
                             if (onWatered != null && daysUntilWatering != null)
                               TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: _forest,
+                                ),
                                 onPressed: onWatered,
                                 icon: const Icon(
                                   Icons.water_drop_outlined,
@@ -295,6 +350,9 @@ class MyPlantCard extends StatelessWidget {
                               ),
                             if (onEditSchedule != null)
                               TextButton(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: _forest,
+                                ),
                                 onPressed: onEditSchedule,
                                 child: Text(
                                   plant.waterEveryDays == null
@@ -311,17 +369,65 @@ class MyPlantCard extends StatelessWidget {
                 if (onRemove != null)
                   IconButton(
                     tooltip: 'Remove from My Plants',
+                    color: _forest,
                     icon: const Icon(Icons.delete_outline),
                     onPressed: onRemove,
                   )
                 else if (onTap != null) ...[
                   const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right),
+                  const Icon(Icons.chevron_right, color: _forest),
                 ],
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Pill showing when a plant needs water. Always dark text on a light pill
+/// (white text this small looks blurry on web): forest border when due
+/// today or overdue, mint when coming up, pale when there's no schedule.
+class _WateringBadge extends StatelessWidget {
+  const _WateringBadge({
+    required this.text,
+    required this.daysUntilWatering,
+  });
+
+  final String text;
+  final int? daysUntilWatering;
+
+  @override
+  Widget build(BuildContext context) {
+    final days = daysUntilWatering;
+    final due = days != null && days <= 0;
+    final background = days == null ? _pale : _mint;
+    final foreground = due ? _forest : _ink;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: due ? _forest : _mint,
+          width: due ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.water_drop, size: 14, color: foreground),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -379,12 +485,15 @@ class MyPlantsMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: Theme.of(context).colorScheme.primary),
+            Icon(icon, size: 48, color: _forest),
             const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: _ink),
             ),
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
