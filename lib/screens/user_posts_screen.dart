@@ -2,9 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
+import '../widgets/post_photo_gallery.dart';
 
-class UserPostsScreen
-    extends StatelessWidget {
+class UserPostsScreen extends StatelessWidget {
   final String userId;
   final String title;
 
@@ -14,217 +15,214 @@ class UserPostsScreen
     this.title = 'Posts',
   });
 
-  @override
-  Widget build(
+  static const Color _forest = PlantPalColors.forest;
+
+  Color _background(BuildContext context) => PlantPalColors.background(context);
+
+  Color _card(BuildContext context) => PlantPalColors.card(context);
+
+  Color _text(BuildContext context) => PlantPalColors.text(context);
+
+  Color _secondary(BuildContext context) =>
+      PlantPalColors.secondaryText(context);
+
+  Color _accent(BuildContext context) => PlantPalColors.accent(context);
+
+  Color _border(BuildContext context) => PlantPalColors.border(context);
+
+  Color _soft(BuildContext context) => PlantPalColors.softBackground(context);
+
+  // Build one post card with all attached photos.
+  Widget _postCard(
     BuildContext context,
+    String postId,
+    Map<String, dynamic> data,
   ) {
-    final DatabaseService databaseService =
-        DatabaseService();
+    final postTitle = (data['title'] ?? '').toString();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
+    final description = (data['description'] ?? '').toString();
+
+    // Supports multiple pictures and older single-picture posts.
+    final List<String> images = postImageUrls(data);
+
+    return Card(
+      color: _card(context),
+      elevation: 1,
+      shadowColor: _forest.withValues(alpha: 0.12),
+      margin: const EdgeInsets.only(bottom: 14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: _border(context)),
       ),
-      body: StreamBuilder<
-          QuerySnapshot<
-              Map<String, dynamic>>>(
-        stream:
-            databaseService
-                .getPostsByUser(
-          userId,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Post title.
+            Text(
+              postTitle,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+                color: _text(context),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Post description.
+            Text(description, style: TextStyle(color: _text(context))),
+
+            // Swipe through pictures.
+            // Tap a picture to open it full screen.
+            if (images.isNotEmpty)
+              PostPhotoGallery(key: ValueKey(postId), imageUrls: images),
+          ],
         ),
-        builder:
-            (context, snapshot) {
-          if (snapshot.connectionState ==
-              ConnectionState.waiting) {
-            return const Center(
-              child:
-                  CircularProgressIndicator(),
-            );
-          }
+      ),
+    );
+  }
 
-          if (snapshot.hasError) {
-            return const Center(
-              child: Text(
-                'Unable to load posts.',
-              ),
-            );
-          }
+  @override
+  Widget build(BuildContext context) {
+    final databaseService = DatabaseService();
 
-          final posts =
-              snapshot.data?.docs ?? [];
+    final baseTheme = Theme.of(context);
 
-          if (posts.isEmpty) {
-            return const Center(
-              child: Text(
-                'No posts yet.',
-              ),
-            );
-          }
+    return Theme(
+      data: baseTheme.copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _forest,
+          brightness: baseTheme.brightness,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: _background(context),
+          foregroundColor: _text(context),
+          surfaceTintColor: Colors.transparent,
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: _background(context),
+        appBar: AppBar(
+          title: Text(
+            title,
+            style: TextStyle(
+              color: _text(context),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: _background(context),
+          foregroundColor: _text(context),
+          surfaceTintColor: Colors.transparent,
+        ),
+        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: databaseService.getPostsByUser(userId),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Unable to load posts.',
+                  style: TextStyle(color: _text(context)),
+                ),
+              );
+            }
 
-          final sortedPosts = [
-            ...posts,
-          ];
+            if (!snapshot.hasData) {
+              return Center(
+                child: CircularProgressIndicator(color: _accent(context)),
+              );
+            }
 
-          sortedPosts.sort(
-            (a, b) {
-              final aData =
-                  a.data();
+            final posts = [...snapshot.data!.docs];
 
-              final bData =
-                  b.data();
+            if (posts.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 450),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: _card(context),
+                      border: Border.all(color: _border(context)),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _soft(context),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.spa_outlined,
+                            color: _accent(context),
+                            size: 48,
+                          ),
+                        ),
 
-              final Timestamp? aTime =
-                  aData['createdAt']
-                      as Timestamp?;
+                        const SizedBox(height: 12),
 
-              final Timestamp? bTime =
-                  bData['createdAt']
-                      as Timestamp?;
+                        Text(
+                          'No posts yet!',
+                          style: TextStyle(
+                            color: _text(context),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 19,
+                          ),
+                        ),
 
-              if (aTime == null &&
-                  bTime == null) {
+                        const SizedBox(height: 8),
+
+                        Text(
+                          'Community posts shared by this user '
+                          'will appear here.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _secondary(context)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // Show the newest posts first.
+            posts.sort((a, b) {
+              final aTime = a.data()['createdAt'] as Timestamp?;
+
+              final bTime = b.data()['createdAt'] as Timestamp?;
+
+              if (aTime == null && bTime == null) {
                 return 0;
               }
 
-              if (aTime == null) {
-                return 1;
-              }
+              if (aTime == null) return 1;
+              if (bTime == null) return -1;
 
-              if (bTime == null) {
-                return -1;
-              }
+              return bTime.compareTo(aTime);
+            });
 
-              return bTime.compareTo(
-                aTime,
-              );
-            },
-          );
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 700),
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
 
-          return ListView.builder(
-            padding:
-                const EdgeInsets.all(
-              12,
-            ),
-            itemCount:
-                sortedPosts.length,
-            itemBuilder:
-                (context, index) {
-              final post =
-                  sortedPosts[index];
-
-              final data =
-                  post.data();
-
-              final String postTitle =
-                  data['title'] ?? '';
-
-              final String description =
-                  data['description'] ??
-                      '';
-
-              final String imageUrl =
-                  data['imageUrl'] ??
-                      '';
-
-              return Card(
-                margin:
-                    const EdgeInsets.only(
-                  bottom: 16,
+                    return _postCard(context, post.id, post.data());
+                  },
                 ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.all(
-                    16,
-                  ),
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
-                    children: [
-                      Text(
-                        postTitle,
-                        style:
-                            const TextStyle(
-                          fontSize: 21,
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(
-                        height: 8,
-                      ),
-
-                      Text(
-                        description,
-                      ),
-
-                      if (imageUrl
-                          .isNotEmpty) ...[
-                        const SizedBox(
-                          height: 14,
-                        ),
-
-                        ClipRRect(
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            12,
-                          ),
-                          child:
-                              Container(
-                            width:
-                                double.infinity,
-                            height: 320,
-                            color:
-                                Colors.black12,
-                            child:
-                                Image.network(
-                              imageUrl,
-                              fit:
-                                  BoxFit.contain,
-                              errorBuilder:
-                                  (
-                                context,
-                                error,
-                                stackTrace,
-                              ) {
-                                return const Center(
-                                  child:
-                                      Column(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment
-                                            .center,
-                                    children: [
-                                      Icon(
-                                        Icons
-                                            .broken_image_outlined,
-                                        size:
-                                            42,
-                                      ),
-                                      SizedBox(
-                                        height:
-                                            8,
-                                      ),
-                                      Text(
-                                        'Unable to load image',
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }

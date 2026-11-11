@@ -221,12 +221,19 @@ class PlantDetails {
       type: _capitalize(_string(json['type'])),
       cycle: _capitalize(_string(json['cycle'])),
       description: _string(json['description']),
-      imageUrl: _imageUrl(json['default_image'], 'regular_url') ??
+      imageUrl:
+          _imageUrl(json['default_image'], 'regular_url') ??
           _imageUrl(json['default_image'], 'medium_url'),
       watering: _capitalize(_string(json['watering'])),
       wateringBenchmark: benchmark,
-      sunlight: _stringList(json['sunlight']).map(_capitalize).whereType<String>().toList(),
-      soil: _stringList(json['soil']).map(_capitalize).whereType<String>().toList(),
+      sunlight: _stringList(json['sunlight'])
+          .map(_capitalize)
+          .whereType<String>()
+          .toList(),
+      soil: _stringList(json['soil'])
+          .map(_capitalize)
+          .whereType<String>()
+          .toList(),
       careLevel: _capitalize(_string(json['care_level'])),
       maintenance: _capitalize(_string(json['maintenance'])),
       growthRate: _capitalize(_string(json['growth_rate'])),
@@ -241,7 +248,7 @@ class PlantDetails {
 }
 
 /// Parses the care guide list response into {section type: description}.
-/// 
+///
 ///-------------------- THIS NEEDS TO BE MORE DETAILED SO THE WIKIPEDIA DESCRIPTION CAN BE MORE CONSISE!!!!! ----------------------
 Map<String, String> parseCareGuide(Map<String, dynamic> json) {
   final guide = <String, String>{};

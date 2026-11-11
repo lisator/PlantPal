@@ -78,8 +78,10 @@ Future<WikipediaExtras> loadWikipediaFor({
   if (article == null || !withCare) {
     return (article: article, care: const <CareTopic, CareExcerpt>{});
   }
-  final care = await WikipediaService.instance
-      .plantCare(article, scientificName: scientificName);
+  final care = await WikipediaService.instance.plantCare(
+    article,
+    scientificName: scientificName,
+  );
   return (article: article, care: care);
 }
 
@@ -107,10 +109,14 @@ class PlantCareGuide extends StatelessWidget {
     required this.details,
     required this.wikipedia,
     this.note,
+    this.collapsible = false,
   });
 
   final PlantDetails details;
   final Future<WikipediaExtras> wikipedia;
+
+  // true on my plants pages: about and care guide start collapsed
+  final bool collapsible;
 
   /// Shown under "Care guide", e.g. where the care info comes from. Defaults
   /// to a note for plants outside the free Perenual plan.
@@ -121,7 +127,8 @@ class PlantCareGuide extends StatelessWidget {
     final humans = details.poisonousToHumans;
     if (pets == null && humans == null) return null;
     return [
-      if (pets != null) pets ? 'Toxic to pets' : 'Not known to be toxic to pets',
+      if (pets != null)
+        pets ? 'Toxic to pets' : 'Not known to be toxic to pets',
       if (humans != null)
         humans ? 'Toxic to humans' : 'Not known to be toxic to humans',
     ].join('. ');
@@ -153,6 +160,71 @@ class PlantCareGuide extends StatelessWidget {
     );
   }
 
+  /// Wikipedia sometimes gives two topics the same sentence, e.g. one
+  /// sentence about both light and water. That excerpt is shown once, titled
+  /// with every topic it covers ("Water & Light"), instead of repeating it.
+  /// Perenual rows are never combined.
+  static List<Widget> _combineDuplicateExcerpts(List<Widget> careRows) {
+    // Each Wikipedia excerpt group sits where its first topic was, with that
+    // topic's icon. Other rows are kept as they are.
+    final groups =
+        <({IconData icon, List<String> titles, CareExcerpt excerpt})>[];
+    final combined = <Object>[];
+    for (final row in careRows) {
+      if (row is! WikipediaCareFact) {
+        combined.add(row);
+        continue;
+      }
+      final index = groups.indexWhere(
+        (group) => _sameExcerpt(group.excerpt.text, row.excerpt.text),
+      );
+      if (index == -1) {
+        groups.add((icon: row.icon, titles: [row.title], excerpt: row.excerpt));
+        combined.add(groups.length - 1);
+        continue;
+      }
+      final group = groups[index];
+      groups[index] = (
+        icon: group.icon,
+        titles: [...group.titles, row.title],
+        // keep the longer excerpt when one contains the other
+        excerpt: row.excerpt.text.length > group.excerpt.text.length
+            ? row.excerpt
+            : group.excerpt,
+      );
+    }
+
+    String joinTitles(List<String> titles) => titles.length == 1
+        ? titles.single
+        : '${titles.sublist(0, titles.length - 1).join(', ')} & ${titles.last}';
+
+    return [
+      for (final item in combined)
+        if (item is int)
+          WikipediaCareFact(
+            icon: groups[item].icon,
+            title: joinTitles(groups[item].titles),
+            excerpt: groups[item].excerpt,
+          )
+        else
+          item as Widget,
+    ];
+  }
+
+  /// True when two excerpts are the same text, or one contains the other,
+  /// ignoring case, spacing and quote styles.
+  static bool _sameExcerpt(String a, String b) {
+    String normalize(String text) => text
+        .toLowerCase()
+        .replaceAll(RegExp('[‘’]'), "'")
+        .replaceAll(RegExp('[“”]'), '"')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final first = normalize(a);
+    final second = normalize(b);
+    return first.contains(second) || second.contains(first);
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -179,11 +251,32 @@ class PlantCareGuide extends StatelessWidget {
         final article = wiki.data?.article;
         final description = details.description ?? article?.extract;
         final rows = [
-          _careRow(CareTopic.water, Icons.water_drop_outlined, 'Water', wiki),
-          _careRow(CareTopic.light, Icons.wb_sunny_outlined, 'Light', wiki),
-          _careRow(CareTopic.soil, Icons.grass, 'Soil', wiki),
+          ..._combineDuplicateExcerpts([
+            _careRow(CareTopic.water, Icons.water_drop_outlined, 'Water', wiki),
+            _careRow(CareTopic.light, Icons.wb_sunny_outlined, 'Light', wiki),
+            _careRow(CareTopic.soil, Icons.grass, 'Soil', wiki),
+          ]),
           for (final fact in otherFacts)
             PlantCareFact(icon: fact.$1, title: fact.$2, description: fact.$3!),
+        ];
+
+        // care guide body: optional source note, then the care rows
+        final careContent = <Widget>[
+          if (note != null || details.isLimited)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                note ??
+                    'Care details for this plant are not included in our '
+                        'current Perenual plan, so Wikipedia is used instead.',
+                style: textTheme.bodySmall,
+              ),
+            ),
+          const SizedBox(height: 8),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            rows[i],
+          ],
         ];
 
         return Column(
@@ -197,39 +290,67 @@ class PlantCareGuide extends StatelessWidget {
               ),
               const SizedBox(height: 20),
             ],
-            if (description != null) ...[
-              Text('About', style: textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(description),
-              const SizedBox(height: 24),
-            ],
-            Text('Care guide', style: textTheme.titleLarge),
-            if (note != null || details.isLimited)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  note ??
-                      'Care details for this plant are not included in our '
-                          'current Perenual plan, so Wikipedia is used instead.',
-                  style: textTheme.bodySmall,
+            if (collapsible) ...[
+              // tap a heading to open/close it
+              if (description != null)
+                _CollapsibleSection(
+                  title: 'About',
+                  children: [Text(description)],
                 ),
+              _CollapsibleSection(
+                title: 'Care guide',
+                subtitle: 'Water, light, soil and more',
+                children: careContent,
               ),
-            const SizedBox(height: 8),
-            for (var i = 0; i < rows.length; i++) ...[
-              if (i > 0) const Divider(height: 1),
-              rows[i],
+            ] else ...[
+              if (description != null) ...[
+                Text('About', style: textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(description),
+                const SizedBox(height: 24),
+              ],
+              Text('Care guide', style: textTheme.titleLarge),
+              ...careContent,
             ],
             const SizedBox(height: 16),
             Text(
               article == null
                   ? 'Plant data from Perenual'
                   : 'Plant data from Perenual. Additional text and images from '
-                      'Wikipedia (CC BY-SA): ${article.pageUrl}',
+                        'Wikipedia (CC BY-SA): ${article.pageUrl}',
               style: textTheme.bodySmall,
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Section heading that expands to show [children]. Starts collapsed.
+class _CollapsibleSection extends StatelessWidget {
+  const _CollapsibleSection({
+    required this.title,
+    required this.children,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: Text(title, style: Theme.of(context).textTheme.titleLarge),
+      subtitle: subtitle == null ? null : Text(subtitle!),
+      // no extra padding or borders, so it lines up with the rest of the page
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(bottom: 16),
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      children: children,
     );
   }
 }
@@ -309,8 +430,9 @@ class WikipediaCareFact extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   excerpt.sourceLabel,
-                  style: textTheme.labelSmall
-                      ?.copyWith(color: colors.onSurfaceVariant),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Container(
@@ -322,8 +444,9 @@ class WikipediaCareFact extends StatelessWidget {
                   ),
                   child: Text(
                     excerpt.text,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(fontStyle: FontStyle.italic),
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -399,7 +522,8 @@ class PlantThumbnailWithFallback extends StatefulWidget {
       _PlantThumbnailWithFallbackState();
 }
 
-class _PlantThumbnailWithFallbackState extends State<PlantThumbnailWithFallback> {
+class _PlantThumbnailWithFallbackState
+    extends State<PlantThumbnailWithFallback> {
   Future<WikipediaSummary?>? _wiki;
 
   @override
@@ -415,13 +539,12 @@ class _PlantThumbnailWithFallbackState extends State<PlantThumbnailWithFallback>
 
   @override
   Widget build(BuildContext context) {
-    if (_wiki == null) return PlantThumbnail(url: widget.url, size: widget.size);
+    if (_wiki == null)
+      return PlantThumbnail(url: widget.url, size: widget.size);
     return FutureBuilder<WikipediaSummary?>(
       future: _wiki,
-      builder: (context, snapshot) => PlantThumbnail(
-        url: snapshot.data?.thumbnailUrl,
-        size: widget.size,
-      ),
+      builder: (context, snapshot) =>
+          PlantThumbnail(url: snapshot.data?.thumbnailUrl, size: widget.size),
     );
   }
 }

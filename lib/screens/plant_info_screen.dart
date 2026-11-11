@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/perenual_models.dart';
 import '../services/perenual_service.dart';
-import 'plant_details_screen.dart';
+import '../theme/plantpal_colors.dart';
 import '../widgets/plant_care_guide.dart';
+import 'plant_details_screen.dart';
 
 class PlantSearch extends StatefulWidget {
   const PlantSearch({super.key});
@@ -27,15 +28,24 @@ class _PlantSearchState extends State<PlantSearch> {
 
   String _activeQuery = '';
   List<PlantSearchResult> _results = [];
+
   int _page = 1;
-  bool _hasMore = false;
   int _total = 0;
+  int _requestId = 0;
+
+  bool _hasMore = false;
   bool _isLoading = false;
   bool _isLoadingMore = false;
+
   String? _error;
 
-  // Ignores responses from searches that were replaced by a newer one.
-  int _requestId = 0;
+  Color get _background => PlantPalColors.background(context);
+  Color get _card => PlantPalColors.card(context);
+  Color get _text => PlantPalColors.text(context);
+  Color get _secondary => PlantPalColors.secondaryText(context);
+  Color get _accent => PlantPalColors.accent(context);
+  Color get _border => PlantPalColors.border(context);
+  Color get _soft => PlantPalColors.softBackground(context);
 
   @override
   void dispose() {
@@ -43,28 +53,38 @@ class _PlantSearchState extends State<PlantSearch> {
     super.dispose();
   }
 
-  // Searches only run on Enter / the search button, never while typing,
-  // to save Perenual's 100 requests/day.
+  // Clear the search when the input is empty.
   void _onQueryChanged(String value) {
     if (value.trim().isNotEmpty) return;
+
     _requestId++;
+
     setState(() {
       _activeQuery = '';
       _results = [];
       _error = null;
       _isLoading = false;
+      _hasMore = false;
+      _total = 0;
     });
   }
 
   void _searchNow(String value) {
     final query = value.trim();
-    if (query.isNotEmpty) _search(query);
+
+    if (query.isNotEmpty) {
+      _search(query);
+    }
   }
 
+  // Search using the Perenual API.
   Future<void> _search(String query) async {
-    if (query == _activeQuery && _error == null && !_isLoading) return;
+    if (query == _activeQuery && _error == null && !_isLoading) {
+      return;
+    }
 
     final requestId = ++_requestId;
+
     setState(() {
       _activeQuery = query;
       _isLoading = true;
@@ -74,7 +94,9 @@ class _PlantSearchState extends State<PlantSearch> {
 
     try {
       final page = await _api.searchPlants(query);
+
       if (!mounted || requestId != _requestId) return;
+
       setState(() {
         _results = page.results;
         _page = page.currentPage;
@@ -83,7 +105,10 @@ class _PlantSearchState extends State<PlantSearch> {
       });
     } on PerenualException catch (e) {
       if (!mounted || requestId != _requestId) return;
-      setState(() => _error = e.message);
+
+      setState(() {
+        _error = e.message;
+      });
     } finally {
       if (mounted && requestId == _requestId) {
         setState(() => _isLoading = false);
@@ -91,14 +116,19 @@ class _PlantSearchState extends State<PlantSearch> {
     }
   }
 
+  // Load more results without repeating earlier ones.
   Future<void> _loadMore() async {
     if (_isLoadingMore || !_hasMore) return;
+
     final requestId = _requestId;
+
     setState(() => _isLoadingMore = true);
 
     try {
       final page = await _api.searchPlants(_activeQuery, page: _page + 1);
+
       if (!mounted || requestId != _requestId) return;
+
       setState(() {
         _results = [..._results, ...page.results];
         _page = page.currentPage;
@@ -106,11 +136,13 @@ class _PlantSearchState extends State<PlantSearch> {
       });
     } on PerenualException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
-      if (mounted) setState(() => _isLoadingMore = false);
+      if (mounted && requestId == _requestId) {
+        setState(() => _isLoadingMore = false);
+      }
     }
   }
 
@@ -126,55 +158,80 @@ class _PlantSearchState extends State<PlantSearch> {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Plant Search',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 16),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _controller,
-                    builder: (context, value, _) => TextField(
-                      controller: _controller,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        labelText: 'Search by plant name',
-                        hintText: 'e.g. monstera, pothos, fern',
-                        helperText: 'Press Enter to search',
-                        prefixIcon: IconButton(
-                          tooltip: 'Search',
-                          icon: const Icon(Icons.search),
-                          onPressed: () => _searchNow(_controller.text),
-                        ),
-                        suffixIcon: value.text.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: 'Clear search',
-                                icon: const Icon(Icons.clear),
-                                onPressed: _clear,
-                              ),
-                        border: const OutlineInputBorder(),
-                      ),
-                      onChanged: _onQueryChanged,
-                      onSubmitted: _searchNow,
+    return ColoredBox(
+      color: _background,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Plant Search',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: _text, fontWeight: FontWeight.w700),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _controller,
+                      builder: (context, value, _) {
+                        return TextField(
+                          controller: _controller,
+                          textInputAction: TextInputAction.search,
+                          style: TextStyle(color: _text),
+                          cursorColor: _accent,
+                          decoration: InputDecoration(
+                            labelText: 'Search by plant name',
+                            hintText: 'e.g. monstera, pothos, fern',
+                            helperText: 'Press Enter to search',
+                            labelStyle: TextStyle(color: _secondary),
+                            hintStyle: TextStyle(color: _secondary),
+                            helperStyle: TextStyle(color: _secondary),
+                            prefixIcon: IconButton(
+                              tooltip: 'Search',
+                              color: _accent,
+                              icon: const Icon(Icons.search),
+                              onPressed: () => _searchNow(_controller.text),
+                            ),
+                            suffixIcon: value.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Clear search',
+                                    color: _accent,
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: _clear,
+                                  ),
+                            filled: true,
+                            fillColor: _card,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(color: _border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(color: _accent, width: 2),
+                            ),
+                          ),
+                          onChanged: _onQueryChanged,
+                          onSubmitted: _searchNow,
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(child: _buildBody(context)),
-          ],
+              Expanded(child: _buildBody(context)),
+            ],
+          ),
         ),
       ),
     );
@@ -191,6 +248,10 @@ class _PlantSearchState extends State<PlantSearch> {
         title: 'Something went wrong',
         message: _error!,
         action: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: PlantPalColors.forest,
+            foregroundColor: Colors.white,
+          ),
           onPressed: () => _search(_activeQuery),
           icon: const Icon(Icons.refresh),
           label: const Text('Try again'),
@@ -202,8 +263,9 @@ class _PlantSearchState extends State<PlantSearch> {
       return _SearchMessage(
         icon: Icons.local_florist_outlined,
         title: 'Find a plant',
-        message: 'Search thousands of species to see watering, sunlight, '
-            'and soil needs.',
+        message:
+            'Search thousands of species to see watering, '
+            'sunlight, and soil needs.',
         action: Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -211,6 +273,9 @@ class _PlantSearchState extends State<PlantSearch> {
           children: [
             for (final suggestion in _suggestions)
               ActionChip(
+                backgroundColor: _soft,
+                side: BorderSide(color: _border),
+                labelStyle: TextStyle(color: _text),
                 label: Text(suggestion),
                 onPressed: () => _useSuggestion(suggestion),
               ),
@@ -223,8 +288,9 @@ class _PlantSearchState extends State<PlantSearch> {
       return _SearchMessage(
         icon: Icons.search_off,
         title: 'No plants found',
-        message: 'No results for "$_activeQuery". '
-            'Try a common name like "fern" or a scientific name.',
+        message:
+            'No results for "$_activeQuery". '
+            'Try a common or scientific name.',
       );
     }
 
@@ -235,28 +301,36 @@ class _PlantSearchState extends State<PlantSearch> {
       itemBuilder: (context, index) {
         if (index == 0) {
           return Text(
-            '$_total result${_total == 1 ? '' : 's'} for "$_activeQuery"',
-            style: Theme.of(context).textTheme.bodySmall,
+            '$_total result${_total == 1 ? '' : 's'} '
+            'for "$_activeQuery"',
+            style: TextStyle(color: _secondary, fontSize: 13),
           );
         }
+
         if (index == _results.length + 1) {
-          if (!_hasMore) return const SizedBox.shrink();
+          if (!_hasMore) {
+            return const SizedBox.shrink();
+          }
+
           return Center(
             child: _isLoadingMore
-                ? const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: CircularProgressIndicator(),
-                  )
+                ? const CircularProgressIndicator()
                 : OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _accent,
+                      side: BorderSide(color: _border),
+                    ),
                     onPressed: _loadMore,
                     child: const Text('Load more'),
                   ),
           );
         }
+
         final plant = _results[index - 1];
+
         return PlantSearchResultCard(
           plant: plant,
-          onTap: () => openPlantDetailsPage(context, plant),
+          onTap: () => openPlantDetailsPage(context, plant, collapseCare: true),
         );
       },
     );
@@ -264,24 +338,29 @@ class _PlantSearchState extends State<PlantSearch> {
 }
 
 class PlantSearchResultCard extends StatelessWidget {
-  const PlantSearchResultCard({
-    super.key,
-    required this.plant,
-    this.onTap,
-  });
+  const PlantSearchResultCard({super.key, required this.plant, this.onTap});
 
   final PlantSearchResult plant;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final text = PlantPalColors.text(context);
+    final secondary = PlantPalColors.secondaryText(context);
+    final accent = PlantPalColors.accent(context);
 
     return Card(
       margin: EdgeInsets.zero,
+      color: PlantPalColors.card(context),
+      elevation: 1,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: PlantPalColors.border(context)),
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
@@ -290,9 +369,9 @@ class PlantSearchResultCard extends StatelessWidget {
                 url: plant.thumbnailUrl,
                 scientificName: plant.scientificName,
                 commonName: plant.commonName,
-                size: 48,
+                size: 56,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,35 +381,51 @@ class PlantSearchResultCard extends StatelessWidget {
                       plant.commonName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleMedium,
+                      style: TextStyle(
+                        color: text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (plant.scientificName.isNotEmpty)
                       Text(
                         plant.scientificName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall
-                            ?.copyWith(fontStyle: FontStyle.italic),
+                        style: TextStyle(
+                          color: secondary,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     if (plant.otherNames.isNotEmpty)
                       Text(
-                        'Also: ${plant.otherNames.take(3).join(', ')}',
+                        'Also: '
+                        '${plant.otherNames.take(3).join(', ')}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall,
+                        style: TextStyle(color: secondary),
                       ),
                     if (!plant.hasFullDetails)
-                      Text(
-                        'Basic info only',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
+                      Container(
+                        margin: const EdgeInsets.only(top: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: PlantPalColors.softBackground(context),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Basic info only',
+                          style: TextStyle(fontSize: 11, color: text),
                         ),
                       ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right),
+              Icon(Icons.chevron_right, color: accent),
             ],
           ),
         ),
@@ -354,27 +449,30 @@ class _SearchMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: colors.primary),
+            Icon(icon, size: 48, color: PlantPalColors.accent(context)),
             const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: TextStyle(
+                color: PlantPalColors.text(context),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              action!,
-            ],
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: PlantPalColors.secondaryText(context)),
+            ),
+            if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),
       ),
