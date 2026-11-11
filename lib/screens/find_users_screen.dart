@@ -1,8 +1,9 @@
- import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
 import 'user_profile_screen.dart';
 
 class FindUsersScreen extends StatefulWidget {
@@ -20,11 +21,13 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
   Future<Map<String, int>>? _suggestionsFuture;
   String? _loadedForUserId;
 
-  static const Color _forest = Color(0xFF315F43);
-  static const Color _sage = Color(0xFF83AD8A);
-  static const Color _pale = Color(0xFFF6F8F2);
-  static const Color _mint = Color(0xFFE0EBDD);
-  static const Color _ink = Color(0xFF24372A);
+  Color get _background => PlantPalColors.background(context);
+  Color get _card => PlantPalColors.card(context);
+  Color get _text => PlantPalColors.text(context);
+  Color get _secondary => PlantPalColors.secondaryText(context);
+  Color get _accent => PlantPalColors.accent(context);
+  Color get _border => PlantPalColors.border(context);
+  Color get _soft => PlantPalColors.softBackground(context);
 
   @override
   void initState() {
@@ -34,12 +37,10 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
 
   void _refreshSuggestions() {
     final user = FirebaseAuth.instance.currentUser;
-
     if (user == null) return;
 
     _loadedForUserId = user.uid;
-    _suggestionsFuture =
-        _databaseService.getSuggestedUserScores(user.uid);
+    _suggestionsFuture = _databaseService.getSuggestedUserScores(user.uid);
   }
 
   @override
@@ -48,7 +49,6 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
     super.dispose();
   }
 
-  // Follow or unfollow a selected user.
   Future<void> _toggleFollow({
     required String currentUserId,
     required String targetUserId,
@@ -67,30 +67,24 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
         );
       }
 
-      // Update suggested people after the follow list changes.
       if (mounted) {
         setState(_refreshSuggestions);
       }
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to update follow: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Unable to update follow: $e')));
     }
   }
 
-  // Open another user's PlantPal profile.
   void _openProfile(String userId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => UserProfileScreen(userId: userId),
-      ),
+      MaterialPageRoute(builder: (_) => UserProfileScreen(userId: userId)),
     );
   }
 
-  // Display a friendly message when no users match the search.
   Widget _emptyState({
     required String title,
     required String description,
@@ -102,24 +96,17 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: _mint,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 42,
-                color: _forest,
-              ),
+            CircleAvatar(
+              radius: 42,
+              backgroundColor: _soft,
+              child: Icon(icon, size: 42, color: _accent),
             ),
             const SizedBox(height: 16),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _forest,
+              style: TextStyle(
+                color: _text,
                 fontSize: 19,
                 fontWeight: FontWeight.bold,
               ),
@@ -128,10 +115,7 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
             Text(
               description,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _ink,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: _secondary, fontSize: 14),
             ),
           ],
         ),
@@ -139,7 +123,6 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
     );
   }
 
-  // Display a user with their profile picture and follow button.
   Widget _buildUserTile({
     required QueryDocumentSnapshot<Map<String, dynamic>> userDoc,
     required String currentUserId,
@@ -155,75 +138,59 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
     final bio = (data['bio'] ?? '').toString().trim();
     final photoUrl = (data['photoUrl'] ?? '').toString().trim();
 
-    // Display usernames without the @ symbol.
     final displayName = username.isNotEmpty
         ? username
-        : (name.isNotEmpty
-            ? name
-            : (email.isNotEmpty ? email : 'PlantPal User'));
+        : name.isNotEmpty
+        ? name
+        : email.isNotEmpty
+        ? email
+        : 'PlantPal User';
 
     final isFollowing = followingIds.contains(userId);
 
-    String subtitle;
-
-    if (mutualCount > 0) {
-      subtitle =
-          'Followed by $mutualCount ${mutualCount == 1 ? 'person' : 'people'} you follow';
-    } else if (bio.isNotEmpty) {
-      subtitle = bio;
-    } else if (name.isNotEmpty) {
-      subtitle = name;
-    } else {
-      subtitle = 'PlantPal member';
-    }
+    final subtitle = mutualCount > 0
+        ? 'Followed by $mutualCount '
+              '${mutualCount == 1 ? 'person' : 'people'} '
+              'you follow'
+        : bio.isNotEmpty
+        ? bio
+        : name.isNotEmpty
+        ? name
+        : 'PlantPal member';
 
     return Card(
-      color: Colors.white,
+      color: _card,
       elevation: 1,
-      shadowColor: _forest.withValues(alpha: 0.10),
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: _mint),
+        side: BorderSide(color: _border),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 12,
-        ),
+        padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Tapping the profile picture opens the user's profile
             InkWell(
               onTap: () => _openProfile(userId),
               borderRadius: BorderRadius.circular(30),
               child: CircleAvatar(
                 radius: 26,
-                backgroundColor: _mint,
+                backgroundColor: _soft,
                 backgroundImage: photoUrl.isNotEmpty
                     ? NetworkImage(photoUrl)
                     : null,
                 child: photoUrl.isEmpty
-                    ? const Icon(
-                        Icons.person,
-                        color: _forest,
-                        size: 28,
-                      )
+                    ? Icon(Icons.person, color: _accent, size: 28)
                     : null,
               ),
             ),
-
             const SizedBox(width: 12),
-
-            // Username and suggested connection information.
             Expanded(
               child: InkWell(
                 onTap: () => _openProfile(userId),
                 borderRadius: BorderRadius.circular(10),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 5,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -231,58 +198,42 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
                         displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _forest,
+                        style: TextStyle(
+                          color: _text,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
-                      if (username.isNotEmpty &&
-                          name.isNotEmpty) ...[
+                      if (username.isNotEmpty && name.isNotEmpty) ...[
                         const SizedBox(height: 3),
                         Text(
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _ink,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: _secondary, fontSize: 12),
                         ),
                       ],
-
                       const SizedBox(height: 4),
-
                       Text(
                         subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: _ink,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: _secondary, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-
             const SizedBox(width: 8),
-
-            // Follow and unfollow using existing Firebase methods.
             isFollowing
                 ? OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: _forest,
-                      side: const BorderSide(color: _sage),
+                      foregroundColor: _accent,
+                      side: BorderSide(color: _border),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 9,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: () => _toggleFollow(
@@ -297,14 +248,11 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
                   )
                 : FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: _forest,
+                      backgroundColor: PlantPalColors.forest,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 9,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: () => _toggleFollow(
@@ -312,10 +260,7 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
                       targetUserId: userId,
                       isFollowing: false,
                     ),
-                    child: const Text(
-                      'Follow',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                    child: const Text('Follow', style: TextStyle(fontSize: 12)),
                   ),
           ],
         ),
@@ -328,339 +273,269 @@ class _FindUsersScreenState extends State<FindUsersScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
-      return const Scaffold(
-        body: Center(
-          child: Text('Please log in.'),
-        ),
-      );
+      return const Scaffold(body: Center(child: Text('Please log in.')));
     }
 
     if (_loadedForUserId != currentUser.uid) {
       _refreshSuggestions();
     }
 
-    // Apply PlantPal colors to Find People only.
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _forest,
+    return Scaffold(
+      backgroundColor: _background,
+      appBar: AppBar(
+        title: Text(
+          'Find People',
+          style: TextStyle(color: _text, fontWeight: FontWeight.bold),
         ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: _forest,
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          hintStyle: const TextStyle(color: _sage),
-          prefixIconColor: _forest,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: _mint),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: _mint),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: _forest,
-              width: 2,
-            ),
-          ),
-        ),
+        centerTitle: true,
+        backgroundColor: _background,
+        foregroundColor: _text,
+        surfaceTintColor: Colors.transparent,
       ),
-      child: Scaffold(
-        backgroundColor: _pale,
-        appBar: AppBar(
-          title: const Text(
-            'Find People',
-            style: TextStyle(
-              color: _forest,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: _pale,
-          surfaceTintColor: _pale,
-        ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 700),
-            child: Column(
-              children: [
-                // SEarch BAR
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    16, 14, 16, 10,
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _search = value.trim().toLowerCase();
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search by username or name',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _search.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _search = '');
-                              },
-                            )
-                          : null,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: _text),
+                  cursorColor: _accent,
+                  onChanged: (value) {
+                    setState(() {
+                      _search = value.trim().toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search by username or name',
+                    hintStyle: TextStyle(color: _secondary),
+                    prefixIcon: Icon(Icons.search, color: _accent),
+                    suffixIcon: _search.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: _accent),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _search = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: _card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: _border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: _border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: _accent, width: 2),
                     ),
                   ),
                 ),
+              ),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _databaseService.getFollowing(currentUser.uid),
+                  builder: (context, followingSnapshot) {
+                    if (followingSnapshot.hasError) {
+                      return const Center(
+                        child: Text('Unable to load following list.'),
+                      );
+                    }
 
-                // Suggested users and search results.
-                Expanded(
-                  child: StreamBuilder<
-                      QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _databaseService.getFollowing(
-                      currentUser.uid,
-                    ),
-                    builder: (context, followingSnapshot) {
-                      if (followingSnapshot.hasError) {
-                        return const Center(
-                          child: Text(
-                            'Unable to load following list.',
-                          ),
-                        );
-                      }
+                    if (!followingSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                      if (!followingSnapshot.hasData) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: _forest,
-                          ),
-                        );
-                      }
+                    final followingIds = followingSnapshot.data!.docs
+                        .map((doc) => doc.id)
+                        .toSet();
 
-                      final followingIds =
-                          followingSnapshot.data!.docs
-                              .map((doc) => doc.id)
-                              .toSet();
+                    return FutureBuilder<Map<String, int>>(
+                      future: _suggestionsFuture,
+                      builder: (context, suggestionSnapshot) {
+                        if (suggestionSnapshot.hasError && _search.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Unable to load recommendations.'),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(_refreshSuggestions);
+                                  },
+                                  child: const Text('Try Again'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
 
-                      return FutureBuilder<Map<String, int>>(
-                        future: _suggestionsFuture,
-                        builder: (context, suggestionSnapshot) {
-                          if (suggestionSnapshot.hasError &&
-                              _search.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    'Unable to load recommendations.',
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      setState(_refreshSuggestions);
-                                    },
-                                    child: const Text('Try Again'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
+                        if (suggestionSnapshot.connectionState ==
+                                ConnectionState.waiting &&
+                            _search.isEmpty) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                          if (suggestionSnapshot.connectionState ==
-                                  ConnectionState.waiting &&
-                              _search.isEmpty) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                color: _forest,
-                              ),
-                            );
-                          }
+                        final scores = suggestionSnapshot.data ?? {};
 
-                          final scores =
-                              suggestionSnapshot.data ?? {};
+                        return StreamBuilder<
+                          QuerySnapshot<Map<String, dynamic>>
+                        >(
+                          stream: _databaseService.getUsers(),
+                          builder: (context, usersSnapshot) {
+                            if (usersSnapshot.hasError) {
+                              return const Center(
+                                child: Text('Unable to load users.'),
+                              );
+                            }
 
-                          return StreamBuilder<
-                              QuerySnapshot<Map<String, dynamic>>>(
-                            stream: _databaseService.getUsers(),
-                            builder: (context, usersSnapshot) {
-                              if (usersSnapshot.hasError) {
-                                return const Center(
-                                  child: Text(
-                                    'Unable to load users.',
-                                  ),
+                            if (!usersSnapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final allUsers = usersSnapshot.data!.docs
+                                .where((doc) => doc.id != currentUser.uid)
+                                .toList();
+
+                            if (_search.isNotEmpty) {
+                              final matchingUsers = allUsers.where((doc) {
+                                final data = doc.data();
+
+                                final username = (data['username'] ?? '')
+                                    .toString()
+                                    .toLowerCase();
+
+                                final name = (data['displayName'] ?? '')
+                                    .toString()
+                                    .toLowerCase();
+
+                                return username.contains(_search) ||
+                                    name.contains(_search);
+                              }).toList();
+
+                              if (matchingUsers.isEmpty) {
+                                return _emptyState(
+                                  title: 'No people found',
+                                  description: 'Try another name or username to find a PlantPal member.',
+                                  icon: Icons.person_search_outlined,
                                 );
                               }
 
-                              if (!usersSnapshot.hasData) {
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                    color: _forest,
-                                  ),
-                                );
-                              }
-
-                              final allUsers = usersSnapshot
-                                  .data!.docs
-                                  .where(
-                                    (doc) =>
-                                        doc.id != currentUser.uid,
-                                  )
-                                  .toList();
-
-                              // When searching, show matching accounts.
-                              if (_search.isNotEmpty) {
-                                final matchingUsers =
-                                    allUsers.where((doc) {
-                                  final data = doc.data();
-
-                                  final username =
-                                      (data['username'] ?? '')
-                                          .toString()
-                                          .toLowerCase();
-
-                                  final name =
-                                      (data['displayName'] ?? '')
-                                          .toString()
-                                          .toLowerCase();
-
-                                  return username.contains(_search) ||
-                                      name.contains(_search);
-                                }).toList();
-
-                                if (matchingUsers.isEmpty) {
-                                  return _emptyState(
-                                    title: 'No people found',
-                                    description:
-                                        'Try another name or username to find a PlantPal member.',
-                                    icon: Icons.person_search_outlined,
-                                  );
-                                }
-
-                                return ListView.builder(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16, 8, 16, 24,
-                                  ),
-                                  itemCount: matchingUsers.length,
-                                  itemBuilder: (context, index) =>
-                                      _buildUserTile(
-                                    userDoc: matchingUsers[index],
+                              return ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  8,
+                                  16,
+                                  24,
+                                ),
+                                itemCount: matchingUsers.length,
+                                itemBuilder: (context, index) {
+                                  final doc = matchingUsers[index];
+                                  return _buildUserTile(
+                                    userDoc: doc,
                                     currentUserId: currentUser.uid,
                                     followingIds: followingIds,
-                                    mutualCount:
-                                        scores[matchingUsers[index].id] ??
-                                            0,
-                                  ),
-                                );
-                              }
-
-                              // Suggested users are people you don't
-                              // follow yet, sorted by mutual connections.
-                              final suggested = allUsers
-                                  .where(
-                                    (doc) =>
-                                        !followingIds.contains(doc.id),
-                                  )
-                                  .toList();
-
-                              suggested.sort((a, b) {
-                                final comparison =
-                                    (scores[b.id] ?? 0)
-                                        .compareTo(scores[a.id] ?? 0);
-
-                                if (comparison != 0) {
-                                  return comparison;
-                                }
-
-                                return a.id.compareTo(b.id);
-                              });
-
-                              if (suggested.isEmpty) {
-                                return _emptyState(
-                                  title: 'No new suggestions',
-                                  description:
-                                      'You are already following everyone available right now.',
-                                  icon: Icons.spa_outlined,
-                                );
-                              }
-
-                              return ListView(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16, 6, 16, 24,
-                                ),
-                                children: [
-                                  // Display the recommended users section.
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    margin: const EdgeInsets.only(
-                                      bottom: 16,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _mint,
-                                      borderRadius:
-                                          BorderRadius.circular(18),
-                                    ),
-                                    child: const Row(
-                                      children: [
-                                        Icon(
-                                          Icons.spa_outlined,
-                                          color: _forest,
-                                          size: 30,
-                                        ),
-                                        SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Suggested for You',
-                                                style: TextStyle(
-                                                  color: _forest,
-                                                  fontSize: 19,
-                                                  fontWeight:
-                                                      FontWeight.bold,
-                                                ),
-                                              ),
-                                              SizedBox(height: 4),
-                                              Text(
-                                                'Discover more plant lovers to follow!',
-                                                style: TextStyle(
-                                                  color: _ink,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Display people with mutual connections first.
-                                  ...suggested.map(
-                                    (doc) => _buildUserTile(
-                                      userDoc: doc,
-                                      currentUserId: currentUser.uid,
-                                      followingIds: followingIds,
-                                      mutualCount: scores[doc.id] ?? 0,
-                                    ),
-                                  ),
-                                ],
+                                    mutualCount: scores[doc.id] ?? 0,
+                                  );
+                                },
                               );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+                            }
+
+                            final suggested = allUsers
+                                .where((doc) => !followingIds.contains(doc.id))
+                                .toList();
+
+                            suggested.sort((a, b) {
+                              final comparison = (scores[b.id] ?? 0).compareTo(
+                                scores[a.id] ?? 0,
+                              );
+
+                              return comparison != 0
+                                  ? comparison
+                                  : a.id.compareTo(b.id);
+                            });
+
+                            if (suggested.isEmpty) {
+                              return _emptyState(
+                                title: 'No new suggestions',
+                                description: 'You are already following everyone available right now.',
+                                icon: Icons.spa_outlined,
+                              );
+                            }
+
+                            return ListView(
+                              padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  decoration: BoxDecoration(
+                                    color: _soft,
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.spa_outlined,
+                                        color: _accent,
+                                        size: 30,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Suggested for You',
+                                              style: TextStyle(
+                                                color: _text,
+                                                fontSize: 19,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Discover more plant lovers to follow!',
+                                              style: TextStyle(
+                                                color: _secondary,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ...suggested.map(
+                                  (doc) => _buildUserTile(
+                                    userDoc: doc,
+                                    currentUserId: currentUser.uid,
+                                    followingIds: followingIds,
+                                    mutualCount: scores[doc.id] ?? 0,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

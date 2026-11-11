@@ -43,9 +43,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
     if (_selectedImages.length >= _maxImages) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You can select up to 5 images.'),
-        ),
+        const SnackBar(content: Text('You can select up to 5 images.')),
       );
       return;
     }
@@ -57,11 +55,9 @@ class _UploadScreenState extends State<UploadScreen> {
         return;
       }
 
-      final remainingSlots =
-          _maxImages - _selectedImages.length;
+      final remainingSlots = _maxImages - _selectedImages.length;
 
-      final imagesToAdd =
-          images.take(remainingSlots).toList();
+      final imagesToAdd = images.take(remainingSlots).toList();
 
       final bytesToAdd = <Uint8List>[];
 
@@ -78,17 +74,11 @@ class _UploadScreenState extends State<UploadScreen> {
 
       if (images.length > remainingSlots && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Only the first 5 images were added.',
-            ),
-          ),
+          const SnackBar(content: Text('Only the first 5 images were added.')),
         );
       }
     } else {
-      final XFile? image = await picker.pickImage(
-        source: ImageSource.camera,
-      );
+      final XFile? image = await picker.pickImage(source: ImageSource.camera);
 
       if (image == null) {
         return;
@@ -105,7 +95,7 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-    void _clearResults() {
+  void _clearResults() {
     _scientificName = null;
     _commonName = null;
     _confidence = null;
@@ -124,22 +114,18 @@ class _UploadScreenState extends State<UploadScreen> {
       _clearResults();
     });
   }
-  
+
   Future<void> _openPlantCamera() async {
     if (_selectedImages.length >= _maxImages) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You can select up to 5 images.'),
-        ),
+        const SnackBar(content: Text('You can select up to 5 images.')),
       );
       return;
     }
 
     final XFile? image = await Navigator.push<XFile>(
       context,
-      MaterialPageRoute(
-        builder: (context) => const PlantCameraScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const PlantCameraScreen()),
     );
 
     if (image == null) {
@@ -160,8 +146,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _analyzePlant() async {
     if (_imageBytesList.isEmpty) {
-  return;
-}
+      return;
+    }
 
     setState(() {
       _isAnalyzing = true;
@@ -183,7 +169,6 @@ class _UploadScreenState extends State<UploadScreen> {
         imageBytesList: _imageBytesList,
       );
 
-
       // -----------------------------
       // PLANT IDENTIFICATION
       // -----------------------------
@@ -191,21 +176,16 @@ class _UploadScreenState extends State<UploadScreen> {
       final suggestions =
           response['result']['classification']['suggestions'] as List;
 
-      final firstSuggestion =
-          suggestions.first as Map<String, dynamic>;
+      final firstSuggestion = suggestions.first as Map<String, dynamic>;
 
-      final scientificName =
-          firstSuggestion['name'].toString();
+      final scientificName = firstSuggestion['name'].toString();
 
-      final confidence =
-          (firstSuggestion['probability'] as num).toDouble();
+      final confidence = (firstSuggestion['probability'] as num).toDouble();
 
       // Common plant names
-      final plantDetails =
-          firstSuggestion['details'] as Map<String, dynamic>?;
+      final plantDetails = firstSuggestion['details'] as Map<String, dynamic>?;
 
-      final commonNames =
-          (plantDetails?['common_names'] as List?) ?? [];
+      final commonNames = (plantDetails?['common_names'] as List?) ?? [];
 
       final commonName = commonNames.isNotEmpty
           ? commonNames.first.toString()
@@ -215,24 +195,22 @@ class _UploadScreenState extends State<UploadScreen> {
       // HEALTH STATUS
       // -----------------------------
 
-      final isHealthy =
-          response['result']['is_healthy']['binary'] as bool;
+      final isHealthy = response['result']['is_healthy']['binary'] as bool;
 
       final diseaseSuggestions =
           (response['result']['disease']['suggestions'] as List?) ?? [];
 
       // Top 3 possible health issues
-      final healthIssues =
-          diseaseSuggestions.take(3).map<Map<String, dynamic>>((issue) {
-        final issueMap =
-            issue as Map<String, dynamic>;
+      final healthIssues = diseaseSuggestions.take(3).map<Map<String, dynamic>>(
+        (issue) {
+          final issueMap = issue as Map<String, dynamic>;
 
-        return {
-          'name': issueMap['name'].toString(),
-          'probability':
-              (issueMap['probability'] as num).toDouble(),
-        };
-      }).toList();
+          return {
+            'name': issueMap['name'].toString(),
+            'probability': (issueMap['probability'] as num).toDouble(),
+          };
+        },
+      ).toList();
 
       // -----------------------------
       // SUGGESTED TREATMENT
@@ -241,24 +219,18 @@ class _UploadScreenState extends State<UploadScreen> {
       List<String> recommendedCare = [];
 
       if (diseaseSuggestions.isNotEmpty) {
-        final topIssue =
-            diseaseSuggestions.first as Map<String, dynamic>;
+        final topIssue = diseaseSuggestions.first as Map<String, dynamic>;
 
-        final issueDetails =
-            topIssue['details'] as Map<String, dynamic>?;
+        final issueDetails = topIssue['details'] as Map<String, dynamic>?;
 
-        final treatment =
-            issueDetails?['treatment'] as Map<String, dynamic>?;
+        final treatment = issueDetails?['treatment'] as Map<String, dynamic>?;
 
         if (treatment != null) {
-          final biological =
-              (treatment['biological'] as List?) ?? [];
+          final biological = (treatment['biological'] as List?) ?? [];
 
-          final chemical =
-              (treatment['chemical'] as List?) ?? [];
+          final chemical = (treatment['chemical'] as List?) ?? [];
 
-          final prevention =
-              (treatment['prevention'] as List?) ?? [];
+          final prevention = (treatment['prevention'] as List?) ?? [];
 
           recommendedCare = [
             ...biological.map((item) => item.toString()),
@@ -277,8 +249,7 @@ class _UploadScreenState extends State<UploadScreen> {
         _commonName = commonName;
         _confidence = confidence;
 
-        _healthStatus =
-            isHealthy ? 'Healthy' : 'Possible health issue';
+        _healthStatus = isHealthy ? 'Healthy' : 'Possible health issue';
 
         _healthIssues = healthIssues;
         _recommendedCare = recommendedCare;
@@ -303,251 +274,81 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   void _resetAnalysis() {
-  setState(() {
-    _selectedImages.clear();
-    _imageBytesList.clear();
-    //_fileName = null;
+    setState(() {
+      _selectedImages.clear();
+      _imageBytesList.clear();
+      //_fileName = null;
 
-    _scientificName = null;
-    _commonName = null;
-    _confidence = null;
-    _healthStatus = null;
-    _errorMessage = null;
+      _scientificName = null;
+      _commonName = null;
+      _confidence = null;
+      _healthStatus = null;
+      _errorMessage = null;
 
-    _healthIssues = [];
-    _recommendedCare = [];
-  });
-}
-
-Future<void> _createNewPlant() async {
-  final userId = currentUserId();
-
-  if (userId == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please sign in to save plants.'),
-      ),
-    );
-    return;
+      _healthIssues = [];
+      _recommendedCare = [];
+    });
   }
 
-  if (_scientificName == null ||
-      _healthStatus == null ||
-      _selectedImages.isEmpty) {
-    return;
-  }
+  Future<void> _createNewPlant() async {
+    final userId = currentUserId();
 
-  final nicknameController = TextEditingController();
-  final locationController = TextEditingController();
-
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Create New Plant'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nicknameController,
-            decoration: const InputDecoration(
-              labelText: 'Nickname (optional)',
-              hintText: 'e.g. Monty',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: locationController,
-            decoration: const InputDecoration(
-              labelText: 'Location (optional)',
-              hintText: 'e.g. Living room',
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Save'),
-        ),
-      ],
-    ),
-  );
-
-  if (result != true || !mounted) {
-    nicknameController.dispose();
-    locationController.dispose();
-    return;
-  }
-
-  setState(() {
-    _isSaving = true;
-  });
-
-  try {
-    final imageUrl =
-        await CloudinaryService().uploadImage(_selectedImages.first);
-
-    final plantId =
-        'analysis_${DateTime.now().millisecondsSinceEpoch}';
-
-    final plant = MyPlant.fromAnalysis(
-      id: plantId,
-      commonName: _commonName ?? _scientificName!,
-      scientificName: _scientificName!,
-      imageUrl: imageUrl,
-      nickname: nicknameController.text,
-      location: locationController.text,
-    );
-
-    await DatabaseService().addMyPlant(
-      userId: userId,
-      plant: plant,
-    );
-
-    await DatabaseService().addPlantAnalysis(
-      userId: userId,
-      plantId: plantId,
-      scientificName: _scientificName!,
-      commonName: _commonName,
-      confidence: _confidence,
-      healthStatus: _healthStatus!,
-      issues: _healthIssues,
-      recommendedCare: _recommendedCare,
-      imageUrl: imageUrl,
-    );
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${plant.displayName} was added to My Plants.',
-        ),
-      ),
-    );
-
-    _resetAnalysis();
-  } catch (e) {
-    debugPrint('Save plant error: $e');
-
-    if (mounted) {
+    if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save plant. Try again.'),
-        ),
-      );
-    }
-  } finally {
-    nicknameController.dispose();
-    locationController.dispose();
-
-    if (mounted) {
-      setState(() {
-        _isSaving = false;
-      });
-    }
-  }
-}
-
-Future<void> _saveToExistingPlant() async {
-  final userId = currentUserId();
-
-  if (userId == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please sign in to save analyses.'),
-      ),
-    );
-    return;
-  }
-
-  if (_scientificName == null ||
-      _healthStatus == null ||
-      _selectedImages.isEmpty) {
-    return;
-  }
-
-  try {
-    final plants =
-        await DatabaseService().getMyPlants(userId).first;
-
-    if (!mounted) return;
-
-    if (plants.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'You do not have any saved plants yet.',
-          ),
-        ),
+        const SnackBar(content: Text('Please sign in to save plants.')),
       );
       return;
     }
 
-    final selectedPlant = await showDialog<MyPlant>(
+    if (_scientificName == null ||
+        _healthStatus == null ||
+        _selectedImages.isEmpty) {
+      return;
+    }
+
+    final nicknameController = TextEditingController();
+    final locationController = TextEditingController();
+
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Save to Existing Plant'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.separated(
-            shrinkWrap: true,
-            itemCount: plants.length,
-            separatorBuilder: (context, index) =>
-                const Divider(),
-            itemBuilder: (context, index) {
-              final plant = plants[index];
-
-              return ListTile(
-                leading: plant.imageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          plant.imageUrl!,
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder:
-                              (context, error, stackTrace) =>
-                                  const Icon(
-                            Icons.local_florist,
-                          ),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.local_florist,
-                      ),
-                title: Text(
-                  plant.displayName,
-                ),
-                subtitle: Text(
-                  plant.scientificName,
-                ),
-                onTap: () {
-                  Navigator.pop(
-                    context,
-                    plant,
-                  );
-                },
-              );
-            },
-          ),
+        title: const Text('Create New Plant'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nicknameController,
+              decoration: const InputDecoration(
+                labelText: 'Nickname (optional)',
+                hintText: 'e.g. Monty',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: locationController,
+              decoration: const InputDecoration(
+                labelText: 'Location (optional)',
+                hintText: 'e.g. Living room',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
 
-    if (selectedPlant == null || !mounted) {
+    if (result != true || !mounted) {
+      nicknameController.dispose();
+      locationController.dispose();
       return;
     }
 
@@ -555,55 +356,188 @@ Future<void> _saveToExistingPlant() async {
       _isSaving = true;
     });
 
-    final imageUrl =
-        await CloudinaryService().uploadImage(
-      _selectedImages.first);
-
-    await DatabaseService().addPlantAnalysis(
-      userId: userId,
-      plantId: selectedPlant.id,
-      scientificName: _scientificName!,
-      commonName: _commonName,
-      confidence: _confidence,
-      healthStatus: _healthStatus!,
-      issues: _healthIssues,
-      recommendedCare: _recommendedCare,
-      imageUrl: imageUrl,
-    );
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Analysis saved to ${selectedPlant.displayName}.',
-        ),
-      ),
-    );
-
-    _resetAnalysis();
-  } catch (e) {
-    debugPrint(
-      'Save existing plant analysis error: $e',
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not save analysis. Try again.',
-          ),
-        ),
+    try {
+      final imageUrl = await CloudinaryService().uploadImage(
+        _selectedImages.first,
       );
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isSaving = false;
-      });
+
+      final plantId = 'analysis_${DateTime.now().millisecondsSinceEpoch}';
+
+      final plant = MyPlant.fromAnalysis(
+        id: plantId,
+        commonName: _commonName ?? _scientificName!,
+        scientificName: _scientificName!,
+        imageUrl: imageUrl,
+        nickname: nicknameController.text,
+        location: locationController.text,
+      );
+
+      await DatabaseService().addMyPlant(userId: userId, plant: plant);
+
+      await DatabaseService().addPlantAnalysis(
+        userId: userId,
+        plantId: plantId,
+        scientificName: _scientificName!,
+        commonName: _commonName,
+        confidence: _confidence,
+        healthStatus: _healthStatus!,
+        issues: _healthIssues,
+        recommendedCare: _recommendedCare,
+        imageUrl: imageUrl,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${plant.displayName} was added to My Plants.')),
+      );
+
+      _resetAnalysis();
+    } catch (e) {
+      debugPrint('Save plant error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save plant. Try again.')),
+        );
+      }
+    } finally {
+      nicknameController.dispose();
+      locationController.dispose();
+
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
-}
+
+  Future<void> _saveToExistingPlant() async {
+    final userId = currentUserId();
+
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to save analyses.')),
+      );
+      return;
+    }
+
+    if (_scientificName == null ||
+        _healthStatus == null ||
+        _selectedImages.isEmpty) {
+      return;
+    }
+
+    try {
+      final plants = await DatabaseService().getMyPlants(userId).first;
+
+      if (!mounted) return;
+
+      if (plants.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You do not have any saved plants yet.'),
+          ),
+        );
+        return;
+      }
+
+      final selectedPlant = await showDialog<MyPlant>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Save to Existing Plant'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: plants.length,
+              separatorBuilder: (context, index) => const Divider(),
+              itemBuilder: (context, index) {
+                final plant = plants[index];
+
+                return ListTile(
+                  leading: plant.imageUrl != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            plant.imageUrl!,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.local_florist),
+                          ),
+                        )
+                      : const Icon(Icons.local_florist),
+                  title: Text(plant.displayName),
+                  subtitle: Text(plant.scientificName),
+                  onTap: () {
+                    Navigator.pop(context, plant);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+
+      if (selectedPlant == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSaving = true;
+      });
+
+      final imageUrl = await CloudinaryService().uploadImage(
+        _selectedImages.first,
+      );
+
+      await DatabaseService().addPlantAnalysis(
+        userId: userId,
+        plantId: selectedPlant.id,
+        scientificName: _scientificName!,
+        commonName: _commonName,
+        confidence: _confidence,
+        healthStatus: _healthStatus!,
+        issues: _healthIssues,
+        recommendedCare: _recommendedCare,
+        imageUrl: imageUrl,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Analysis saved to ${selectedPlant.displayName}.'),
+        ),
+      );
+
+      _resetAnalysis();
+    } catch (e) {
+      debugPrint('Save existing plant analysis error: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save analysis. Try again.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool hasResults = _scientificName != null;
@@ -630,7 +564,6 @@ Future<void> _saveToExistingPlant() async {
         // BEFORE ANALYSIS
         // Take Picture / Upload Picture / Preview / Analyze
         // ============================================================
-
         if (!hasResults) ...[
           Row(
             children: [
@@ -638,19 +571,12 @@ Future<void> _saveToExistingPlant() async {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _openPlantCamera,
-                  icon: const Icon(
-                    Icons.camera_alt_outlined,
-                  ),
-                  label: const Text(
-                    'Take Picture',
-                  ),
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: const Text('Take Picture'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 15,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
@@ -661,21 +587,13 @@ Future<void> _saveToExistingPlant() async {
               // UPLOAD PICTURE
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _pickImage(ImageSource.gallery),
-                  icon: const Icon(
-                    Icons.photo_library_outlined,
-                  ),
-                  label: const Text(
-                    'Upload Picture',
-                  ),
+                  onPressed: () => _pickImage(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Upload Picture'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 15,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
@@ -686,102 +604,87 @@ Future<void> _saveToExistingPlant() async {
           // ------------------------------------------------------------
           // SELECTED IMAGE
           // ------------------------------------------------------------
-
           if (_imageBytesList.isNotEmpty) ...[
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-              Text(
-                '${_imageBytesList.length} of $_maxImages photos selected',
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontWeight: FontWeight.w500,
-                ),
+            Text(
+              '${_imageBytesList.length} of $_maxImages photos selected',
+              style: const TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w500,
               ),
+            ),
 
-              const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-              SizedBox(
-                height: 120,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _imageBytesList.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    return Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.memory(
-                            _imageBytesList[index],
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                          ),
+            SizedBox(
+              height: 120,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _imageBytesList.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.memory(
+                          _imageBytesList[index],
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
                         ),
+                      ),
 
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: InkWell(
-                            onTap: () => _removeImage(index),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 18,
-                                color: Colors.white,
-                              ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: InkWell(
+                          onTap: () => _removeImage(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 18,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                      ],
-                    );
-                  },
-                ),
+                      ),
+                    ],
+                  );
+                },
               ),
+            ),
 
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // ----------------------------------------------------------
             // ANALYZE BUTTON
             // ----------------------------------------------------------
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed:
-                    _isAnalyzing ? null : _analyzePlant,
+                onPressed: _isAnalyzing ? null : _analyzePlant,
 
                 icon: _isAnalyzing
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(
-                        Icons.eco,
-                      ),
+                    : const Icon(Icons.eco),
 
-                label: Text(
-                  _isAnalyzing
-                      ? 'Analyzing...'
-                      : 'Analyze Plant',
-                ),
+                label: Text(_isAnalyzing ? 'Analyzing...' : 'Analyze Plant'),
 
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 15,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
@@ -792,7 +695,6 @@ Future<void> _saveToExistingPlant() async {
         // ============================================================
         // ERROR MESSAGE
         // ============================================================
-
         if (_errorMessage != null) ...[
           const SizedBox(height: 18),
 
@@ -803,22 +705,16 @@ Future<void> _saveToExistingPlant() async {
               borderRadius: BorderRadius.circular(18),
             ),
             child: Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.error_outline,
-                  color: Colors.red.shade700,
-                ),
+                Icon(Icons.error_outline, color: Colors.red.shade700),
 
                 const SizedBox(width: 10),
 
                 Expanded(
                   child: Text(
                     _errorMessage!,
-                    style: TextStyle(
-                      color: Colors.red.shade800,
-                    ),
+                    style: TextStyle(color: Colors.red.shade800),
                   ),
                 ),
               ],
@@ -830,7 +726,6 @@ Future<void> _saveToExistingPlant() async {
         // AFTER ANALYSIS
         // Photo + Plant + Health + Treatment + Save Options
         // ============================================================
-
         if (hasResults) ...[
           // ------------------------------------------------------------
           // RESULT IMAGE
@@ -842,8 +737,7 @@ Future<void> _saveToExistingPlant() async {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _imageBytesList.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(width: 10),
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(16),
@@ -861,7 +755,6 @@ Future<void> _saveToExistingPlant() async {
           // ============================================================
           // PLANT IDENTIFICATION CARD
           // ============================================================
-
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -872,8 +765,7 @@ Future<void> _saveToExistingPlant() async {
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         _scientificName!,
@@ -901,15 +793,13 @@ Future<void> _saveToExistingPlant() async {
 
                 if (_confidence != null)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 13,
                       vertical: 9,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFDDEBD5),
-                      borderRadius:
-                          BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(22),
                     ),
                     child: Row(
                       children: [
@@ -940,7 +830,6 @@ Future<void> _saveToExistingPlant() async {
           // ============================================================
           // HEALTH STATUS
           // ============================================================
-
           if (_healthStatus != null)
             Container(
               padding: const EdgeInsets.all(17),
@@ -966,27 +855,22 @@ Future<void> _saveToExistingPlant() async {
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           _healthStatus!,
                           style: const TextStyle(
                             fontSize: 18,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
 
-                        if (_healthStatus !=
-                            'Healthy') ...[
+                        if (_healthStatus != 'Healthy') ...[
                           const SizedBox(height: 3),
 
                           const Text(
                             'Your plant shows signs of stress.',
-                            style: TextStyle(
-                              color: Colors.black54,
-                            ),
+                            style: TextStyle(color: Colors.black54),
                           ),
                         ],
                       ],
@@ -999,7 +883,6 @@ Future<void> _saveToExistingPlant() async {
           // ============================================================
           // DETECTED ISSUES
           // ============================================================
-
           if (_healthIssues.isNotEmpty) ...[
             const SizedBox(height: 24),
 
@@ -1015,28 +898,21 @@ Future<void> _saveToExistingPlant() async {
             const SizedBox(height: 12),
 
             ..._healthIssues.map((issue) {
-              final double probability =
-                  issue['probability'] as double;
+              final double probability = issue['probability'] as double;
 
               return Container(
-                margin:
-                    const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.grey.shade300,
-                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding:
-                          const EdgeInsets.all(8),
-                      decoration:
-                          const BoxDecoration(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
                         color: Color(0xFFE4F0DF),
                         shape: BoxShape.circle,
                       ),
@@ -1052,9 +928,7 @@ Future<void> _saveToExistingPlant() async {
                     Expanded(
                       child: Text(
                         issue['name'].toString(),
-                        style: const TextStyle(
-                          fontSize: 16,
-                        ),
+                        style: const TextStyle(fontSize: 16),
                       ),
                     ),
 
@@ -1074,7 +948,6 @@ Future<void> _saveToExistingPlant() async {
           // ============================================================
           // SUGGESTED TREATMENT
           // ============================================================
-
           if (_recommendedCare.isNotEmpty) ...[
             const SizedBox(height: 24),
 
@@ -1096,25 +969,17 @@ Future<void> _saveToExistingPlant() async {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
-                children:
-                    _recommendedCare.map((care) {
+                children: _recommendedCare.map((care) {
                   return Padding(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      vertical: 8,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Padding(
-                          padding:
-                              EdgeInsets.only(top: 1),
+                          padding: EdgeInsets.only(top: 1),
                           child: Icon(
-                            Icons
-                                .check_circle_outline,
-                            color:
-                                Color(0xFF4F7C56),
+                            Icons.check_circle_outline,
+                            color: Color(0xFF4F7C56),
                             size: 22,
                           ),
                         ),
@@ -1124,11 +989,7 @@ Future<void> _saveToExistingPlant() async {
                         Expanded(
                           child: Text(
                             care,
-                            style:
-                                const TextStyle(
-                              fontSize: 15.5,
-                              height: 1.4,
-                            ),
+                            style: const TextStyle(fontSize: 15.5, height: 1.4),
                           ),
                         ),
                       ],
@@ -1142,7 +1003,6 @@ Future<void> _saveToExistingPlant() async {
           // ============================================================
           // SAVE ANALYSIS
           // ============================================================
-
           const SizedBox(height: 28),
 
           const Text(
@@ -1158,10 +1018,7 @@ Future<void> _saveToExistingPlant() async {
 
           const Text(
             'Save this analysis to My Plants to track your plant\'s health over time.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.black54),
           ),
 
           const SizedBox(height: 16),
@@ -1169,25 +1026,16 @@ Future<void> _saveToExistingPlant() async {
           // ------------------------------------------------------------
           // CREATE NEW PLANT
           // ------------------------------------------------------------
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _isSaving
-                  ? null
-                  : _createNewPlant,
-              icon: const Icon(
-                Icons.add_circle_outline,
-              ),
-              label: const Text(
-                'Create New Plant',
-              ),
+              onPressed: _isSaving ? null : _createNewPlant,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Create New Plant'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF315D3A),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 15,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -1200,28 +1048,17 @@ Future<void> _saveToExistingPlant() async {
           // ------------------------------------------------------------
           // SAVE TO EXISTING PLANT
           // ------------------------------------------------------------
-
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _isSaving
-                ? null
-                : _saveToExistingPlant,
+              onPressed: _isSaving ? null : _saveToExistingPlant,
 
-              icon: const Icon(
-                Icons.bookmark_add_outlined,
-              ),
-              label: const Text(
-                'Save to Existing Plant',
-              ),
+              icon: const Icon(Icons.bookmark_add_outlined),
+              label: const Text('Save to Existing Plant'),
               style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(
-                  vertical: 15,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
@@ -1232,26 +1069,17 @@ Future<void> _saveToExistingPlant() async {
           // ============================================================
           // DISCARD / ANALYZE ANOTHER
           // ============================================================
-
           Row(
             children: [
               // DISCARD
               Expanded(
                 child: TextButton.icon(
                   onPressed: _resetAnalysis,
-                  icon: const Icon(
-                    Icons.delete_outline,
-                  ),
-                  label: const Text(
-                    'Discard',
-                  ),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Discard'),
                   style: TextButton.styleFrom(
-                    foregroundColor:
-                        Colors.red.shade700,
-                    padding:
-                        const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
+                    foregroundColor: Colors.red.shade700,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
@@ -1262,21 +1090,12 @@ Future<void> _saveToExistingPlant() async {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: _resetAnalysis,
-                  icon: const Icon(
-                    Icons.refresh,
-                  ),
-                  label: const Text(
-                    'Analyze Another',
-                  ),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Analyze Another'),
                   style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
-                    shape:
-                        RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(16),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),

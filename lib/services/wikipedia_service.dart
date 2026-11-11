@@ -62,7 +62,8 @@ class WikipediaSummary {
     return WikipediaSummary(
       title: title,
       extract: extract,
-      pageUrl: pageUrl ??
+      pageUrl:
+          pageUrl ??
           'https://en.wikipedia.org/wiki/${Uri.encodeComponent(title)}',
       imageUrl: (useOriginal ? source(original) : null) ?? thumbnail,
       thumbnailUrl: thumbnail ?? (useOriginal ? source(original) : null),
@@ -82,7 +83,8 @@ class WikipediaService {
 
   static final WikipediaService instance = WikipediaService._();
 
-  static const String _summaryUrl = 'https://en.wikipedia.org/api/rest_v1/page/summary';
+  static const String _summaryUrl =
+      'https://en.wikipedia.org/api/rest_v1/page/summary';
   static const String _actionApiUrl = 'https://en.wikipedia.org/w/api.php';
   static const Duration _cacheDuration = Duration(days: 30);
   static const String _cachePrefix = 'wikipedia_cache:';
@@ -126,7 +128,9 @@ class WikipediaService {
     required String scientificName,
   }) async {
     final care = {
-      for (final MapEntry(:key, :value) in (await careExcerpts(article)).entries)
+      for (final MapEntry(:key, :value) in (await careExcerpts(
+        article,
+      )).entries)
         key: CareExcerpt(text: value, article: article),
     };
     if (care.length == CareTopic.values.length) return care;
@@ -136,7 +140,9 @@ class WikipediaService {
         genusName.toLowerCase() != article.title.toLowerCase()) {
       final genus = await _summary(genusName);
       if (genus != null && genus.title != article.title) {
-        for (final MapEntry(:key, :value) in (await careExcerpts(genus)).entries) {
+        for (final MapEntry(:key, :value) in (await careExcerpts(
+          genus,
+        )).entries) {
           care.putIfAbsent(
             key,
             () => CareExcerpt(text: value, article: genus, fromGenus: true),
@@ -160,8 +166,13 @@ class WikipediaService {
 
   Future<WikipediaSummary?> _loadSummary(String title) async {
     try {
-      final body = await _cachedJson(_cachePrefix + title, () => _fetchSummary(title));
-      return body is Map<String, dynamic> ? WikipediaSummary.fromJson(body) : null;
+      final body = await _cachedJson(
+        _cachePrefix + title,
+        () => _fetchSummary(title),
+      );
+      return body is Map<String, dynamic>
+          ? WikipediaSummary.fromJson(body)
+          : null;
     } catch (e) {
       // Network problems aren't cached, so the next visit can try again.
       debugPrint('Wikipedia lookup for "$title" failed: $e');
@@ -243,7 +254,9 @@ class WikipediaService {
       final saved = prefs.getString(cacheKey);
       if (saved != null) {
         final entry = jsonDecode(saved) as Map<String, dynamic>;
-        final savedAt = DateTime.fromMillisecondsSinceEpoch(entry['savedAt'] as int);
+        final savedAt = DateTime.fromMillisecondsSinceEpoch(
+          entry['savedAt'] as int,
+        );
         if (DateTime.now().difference(savedAt) < _cacheDuration) {
           return entry['body'];
         }
@@ -271,8 +284,10 @@ class WikipediaService {
   /// Throws on network errors.
   Future<Map<String, dynamic>?> _fetchSummary(String title) async {
     final path = Uri.encodeComponent(title.replaceAll(' ', '_'));
-    final response =
-        await http.get(Uri.parse('$_summaryUrl/$path'), headers: _headers);
+    final response = await http.get(
+      Uri.parse('$_summaryUrl/$path'),
+      headers: _headers,
+    );
 
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
@@ -285,22 +300,23 @@ class WikipediaService {
   /// Returns the whole article as plain text with "== Heading ==" lines, or
   /// null when there is no such article. Throws on network errors.
   Future<String?> _fetchArticleText(String title) async {
-    final response = await http
-        .get(
-          Uri.parse(_actionApiUrl).replace(queryParameters: {
-            'action': 'query',
-            'format': 'json',
-            'formatversion': '2',
-            'prop': 'extracts',
-            'explaintext': '1',
-            'exsectionformat': 'wiki',
-            'redirects': '1',
-            'titles': title,
-            // Allows the request from the web build.
-            'origin': '*',
-          }),
-          headers: _headers,
-        );
+    final response = await http.get(
+      Uri.parse(_actionApiUrl).replace(
+        queryParameters: {
+          'action': 'query',
+          'format': 'json',
+          'formatversion': '2',
+          'prop': 'extracts',
+          'explaintext': '1',
+          'exsectionformat': 'wiki',
+          'redirects': '1',
+          'titles': title,
+          // Allows the request from the web build.
+          'origin': '*',
+        },
+      ),
+      headers: _headers,
+    );
 
     if (response.statusCode != 200) {
       throw Exception('HTTP ${response.statusCode}');
@@ -472,7 +488,8 @@ const int _minSentenceLength = 15;
 const int _maxSentenceLength = 240;
 const int _maxExcerptLength = 260;
 
-int _count(RegExp pattern, String text) => pattern.allMatches(text).length.clamp(0, 2);
+int _count(RegExp pattern, String text) =>
+    pattern.allMatches(text).length.clamp(0, 2);
 
 /// Strong watering words count double. Weak ones ("dry", "moisture") only
 /// count when the sentence is about the plant's soil or pot, so climate
@@ -493,7 +510,8 @@ int _soilHits(String sentence) {
   final materials = _count(_soilMaterialPattern, sentence);
   if (materials > 0) return materials * 2;
   final isWater = _waterHits(sentence) > 0;
-  return !isWater && RegExp(r'\bsoils?\b', caseSensitive: false).hasMatch(sentence)
+  return !isWater &&
+          RegExp(r'\bsoils?\b', caseSensitive: false).hasMatch(sentence)
       ? 1
       : 0;
 }
@@ -526,9 +544,14 @@ final RegExp _offTopic = RegExp(
   caseSensitive: false,
 );
 
-final RegExp _careHeading =
-    RegExp(r'cultivat|\bcare\b|growing|horticultur|houseplant|indoor', caseSensitive: false);
-final RegExp _indoorHeading = RegExp(r'indoor|houseplant', caseSensitive: false);
+final RegExp _careHeading = RegExp(
+  r'cultivat|\bcare\b|growing|horticultur|houseplant|indoor',
+  caseSensitive: false,
+);
+final RegExp _indoorHeading = RegExp(
+  r'indoor|houseplant',
+  caseSensitive: false,
+);
 
 /// Propagation and nursery sentences mention soil and water but aren't care advice.
 final RegExp _skipSentence = RegExp(
@@ -575,11 +598,21 @@ String speciesTitle(String scientificName) {
   final words = scientificName
       .split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty)
-      .takeWhile((word) =>
-          !word.startsWith("'") &&
-          !word.startsWith('"') &&
-          !word.startsWith('(') &&
-          !const {'var.', 'subsp.', 'ssp.', 'f.', 'cv.', 'x', '×'}.contains(word))
+      .takeWhile(
+        (word) =>
+            !word.startsWith("'") &&
+            !word.startsWith('"') &&
+            !word.startsWith('(') &&
+            !const {
+              'var.',
+              'subsp.',
+              'ssp.',
+              'f.',
+              'cv.',
+              'x',
+              '×',
+            }.contains(word),
+      )
       .take(2)
       .toList();
   return words.join(' ');

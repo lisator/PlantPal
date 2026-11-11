@@ -78,8 +78,10 @@ Future<WikipediaExtras> loadWikipediaFor({
   if (article == null || !withCare) {
     return (article: article, care: const <CareTopic, CareExcerpt>{});
   }
-  final care = await WikipediaService.instance
-      .plantCare(article, scientificName: scientificName);
+  final care = await WikipediaService.instance.plantCare(
+    article,
+    scientificName: scientificName,
+  );
   return (article: article, care: care);
 }
 
@@ -125,7 +127,8 @@ class PlantCareGuide extends StatelessWidget {
     final humans = details.poisonousToHumans;
     if (pets == null && humans == null) return null;
     return [
-      if (pets != null) pets ? 'Toxic to pets' : 'Not known to be toxic to pets',
+      if (pets != null)
+        pets ? 'Toxic to pets' : 'Not known to be toxic to pets',
       if (humans != null)
         humans ? 'Toxic to humans' : 'Not known to be toxic to humans',
     ].join('. ');
@@ -164,7 +167,8 @@ class PlantCareGuide extends StatelessWidget {
   static List<Widget> _combineDuplicateExcerpts(List<Widget> careRows) {
     // Each Wikipedia excerpt group sits where its first topic was, with that
     // topic's icon. Other rows are kept as they are.
-    final groups = <({IconData icon, List<String> titles, CareExcerpt excerpt})>[];
+    final groups =
+        <({IconData icon, List<String> titles, CareExcerpt excerpt})>[];
     final combined = <Object>[];
     for (final row in careRows) {
       if (row is! WikipediaCareFact) {
@@ -313,7 +317,7 @@ class PlantCareGuide extends StatelessWidget {
               article == null
                   ? 'Plant data from Perenual'
                   : 'Plant data from Perenual. Additional text and images from '
-                      'Wikipedia (CC BY-SA): ${article.pageUrl}',
+                        'Wikipedia (CC BY-SA): ${article.pageUrl}',
               style: textTheme.bodySmall,
             ),
           ],
@@ -426,8 +430,9 @@ class WikipediaCareFact extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   excerpt.sourceLabel,
-                  style: textTheme.labelSmall
-                      ?.copyWith(color: colors.onSurfaceVariant),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Container(
@@ -439,8 +444,9 @@ class WikipediaCareFact extends StatelessWidget {
                   ),
                   child: Text(
                     excerpt.text,
-                    style: textTheme.bodyMedium
-                        ?.copyWith(fontStyle: FontStyle.italic),
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -516,7 +522,8 @@ class PlantThumbnailWithFallback extends StatefulWidget {
       _PlantThumbnailWithFallbackState();
 }
 
-class _PlantThumbnailWithFallbackState extends State<PlantThumbnailWithFallback> {
+class _PlantThumbnailWithFallbackState
+    extends State<PlantThumbnailWithFallback> {
   Future<WikipediaSummary?>? _wiki;
 
   @override
@@ -532,13 +539,12 @@ class _PlantThumbnailWithFallbackState extends State<PlantThumbnailWithFallback>
 
   @override
   Widget build(BuildContext context) {
-    if (_wiki == null) return PlantThumbnail(url: widget.url, size: widget.size);
+    if (_wiki == null)
+      return PlantThumbnail(url: widget.url, size: widget.size);
     return FutureBuilder<WikipediaSummary?>(
       future: _wiki,
-      builder: (context, snapshot) => PlantThumbnail(
-        url: snapshot.data?.thumbnailUrl,
-        size: widget.size,
-      ),
+      builder: (context, snapshot) =>
+          PlantThumbnail(url: snapshot.data?.thumbnailUrl, size: widget.size),
     );
   }
 }

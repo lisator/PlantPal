@@ -25,10 +25,7 @@ Future<void> markPlantWatered(
   final messenger = ScaffoldMessenger.of(context);
   final previous = plant.lastWateredAt ?? plant.addedAt;
   try {
-    await DatabaseService().setLastWatered(
-      userId: userId,
-      plantId: plant.id,
-    );
+    await DatabaseService().setLastWatered(userId: userId, plantId: plant.id);
   } catch (e) {
     debugPrint('Watering error: $e');
     messenger.showSnackBar(
@@ -39,21 +36,23 @@ Future<void> markPlantWatered(
 
   messenger
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(
-      content: Text('${plant.displayName} watered'),
-      action: previous == null
-          ? null
-          : SnackBarAction(
-              label: 'Undo',
-              onPressed: () => DatabaseService()
-                  .setLastWatered(
-                    userId: userId,
-                    plantId: plant.id,
-                    at: previous,
-                  )
-                  .catchError((Object e) => debugPrint('Undo error: $e')),
-            ),
-    ));
+    ..showSnackBar(
+      SnackBar(
+        content: Text('${plant.displayName} watered'),
+        action: previous == null
+            ? null
+            : SnackBarAction(
+                label: 'Undo',
+                onPressed: () => DatabaseService()
+                    .setLastWatered(
+                      userId: userId,
+                      plantId: plant.id,
+                      at: previous,
+                    )
+                    .catchError((Object e) => debugPrint('Undo error: $e')),
+              ),
+      ),
+    );
 }
 
 /// Lets the user set or clear how often [plant] is watered.
@@ -70,10 +69,8 @@ Future<void> editWateringSchedule(
 
   final result = await showDialog<({int? days})>(
     context: context,
-    builder: (context) => _WateringScheduleDialog(
-      plant: plant,
-      suggested: suggested,
-    ),
+    builder: (context) =>
+        _WateringScheduleDialog(plant: plant, suggested: suggested),
   );
   if (result == null) return;
 
@@ -140,7 +137,7 @@ class _WateringScheduleDialogState extends State<_WateringScheduleDialog> {
               summary != null
                   ? 'Perenual suggests: $summary'
                   : 'Perenual has no watering schedule for this plant. '
-                      'Check its care page for guidance.',
+                        'Check its care page for guidance.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -220,8 +217,9 @@ class WateringRemindersCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final scheduled = plants.where((p) => p.waterEveryDays != null).toList()
-      ..sort((a, b) =>
-          a.daysUntilWatering()!.compareTo(b.daysUntilWatering()!));
+      ..sort(
+        (a, b) => a.daysUntilWatering()!.compareTo(b.daysUntilWatering()!),
+      );
     final due = scheduled.where((p) => p.daysUntilWatering()! <= 0).toList();
     final upcoming = scheduled.where((p) => p.daysUntilWatering()! > 0);
     final unscheduled = plants.where((p) => p.waterEveryDays == null);
@@ -235,7 +233,8 @@ class WateringRemindersCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: ReminderCard(
-            message: '${wateringStatus(plant)}: ${plant.displayName}'
+            message:
+                '${wateringStatus(plant)}: ${plant.displayName}'
                 '${plant.nickname != null ? ' (${plant.commonName})' : ''}',
             onChanged: (checked) {
               if (checked == true) {
@@ -263,11 +262,8 @@ class WateringRemindersCard extends StatelessWidget {
               ),
             ),
             TextButton(
-              onPressed: () => editWateringSchedule(
-                context,
-                userId: userId,
-                plant: plant,
-              ),
+              onPressed: () =>
+                  editWateringSchedule(context, userId: userId, plant: plant),
               child: const Text('Set'),
             ),
           ],

@@ -50,18 +50,20 @@ Rules:
 - If there is no care advice for a topic, return an empty string for it.''';
 
   GenerativeModel _model(String name) => FirebaseAI.googleAI().generativeModel(
-        model: name,
-        systemInstruction: Content.system(_instructions),
-        generationConfig: GenerationConfig(
-          // 0 = always pick the most likely answer, so results are consistent.
-          temperature: 0,
-          // Forces the reply to be JSON with exactly these three fields.
-          responseMimeType: 'application/json',
-          responseSchema: Schema.object(properties: {
-            for (final topic in CareTopic.values) topic.name: Schema.string(),
-          }),
-        ),
-      );
+    model: name,
+    systemInstruction: Content.system(_instructions),
+    generationConfig: GenerationConfig(
+      // 0 = always pick the most likely answer, so results are consistent.
+      temperature: 0,
+      // Forces the reply to be JSON with exactly these three fields.
+      responseMimeType: 'application/json',
+      responseSchema: Schema.object(
+        properties: {
+          for (final topic in CareTopic.values) topic.name: Schema.string(),
+        },
+      ),
+    ),
+  );
 
   /// Care sentences Gemini picked from [careText] (an article's care
   /// sections), by topic, or null if no model could be reached.
@@ -73,8 +75,8 @@ Rules:
     for (final name in modelNames) {
       try {
         // No time limit: a slow answer is better than no care info.
-        final response =
-            await _model(name).generateContent([Content.text(text)]);
+        final response = await _model(name)
+            .generateContent([Content.text(text)]);
         final json = jsonDecode(response.text ?? '');
         return json is Map ? verifiedExcerpts(json, text) : null;
       } catch (e) {
@@ -97,7 +99,10 @@ Rules:
 /// Keeps only the answers in [json] whose every sentence really appears in
 /// [article], so the app never shows text Gemini invented or reworded.
 @visibleForTesting
-Map<CareTopic, String> verifiedExcerpts(Map<dynamic, dynamic> json, String article) {
+Map<CareTopic, String> verifiedExcerpts(
+  Map<dynamic, dynamic> json,
+  String article,
+) {
   final normalizedArticle = _normalize(article);
   bool inArticle(String sentence) =>
       normalizedArticle.contains(_normalize(sentence));

@@ -1,4 +1,4 @@
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -8,18 +8,15 @@ import '../models/my_plant.dart';
 import '../screens/notifications_screen.dart';
 import '../services/database_service.dart';
 import '../services/notification_service.dart';
+import '../services/plant_reminder_service.dart';
 
-// Display a notification bell with an unread count.
 class NotificationBell extends StatelessWidget {
   const NotificationBell({super.key});
 
-  // PlantPal green.
   static const Color _forest = Color(0xFF315F43);
 
   @override
   Widget build(BuildContext context) {
-    // Only show the bell when Firebase is ready
-    // and someone is signed in.
     final uid = Firebase.apps.isEmpty
         ? null
         : FirebaseAuth.instance.currentUser?.uid;
@@ -28,53 +25,100 @@ class NotificationBell extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // Listen for new Community notifications.
-    return StreamBuilder<List<AppNotification>>(
-      stream: NotificationService().watchNotifications(uid),
-      builder: (context, activitySnapshot) {
-        // Count notifications that have not been read.
-        final activityCount = activitySnapshot.data
-                ?.where((notification) => !notification.isRead)
-                .length ??
-            0;
+    final database = DatabaseService();
+    final notificationService = NotificationService();
+    final reminderService = PlantReminderService();
 
-        // Also check whether any plants need watering.
-        return StreamBuilder<List<MyPlant>>(
-          stream: DatabaseService().getMyPlants(uid),
-          builder: (context, plantSnapshot) {
-            final wateringCount = plantSnapshot.data
-                    ?.where((plant) {
-                      final days = plant.daysUntilWatering();
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .snapshots(),
+      builder: (context, settingsSnapshot) {
+        final userData = settingsSnapshot.data?.data();
+        final rawSettings = userData?['settings'];
 
-                      return days != null && days <= 0;
-                    })
-                    .length ??
-                0;
+        final settings = rawSettings is Map ? rawSettings : const {};
 
-            // Combine unread activity and watering reminders.
-            final total = activityCount + wateringCount;
+        final communityEnabled = settings['communityNotifications'] != false;
 
-            return IconButton(
-              tooltip: 'Notifications',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const NotificationsScreen(),
-                  ),
+        final wateringEnabled = settings['wateringReminders'] != false;
+
+        final progressEnabled = settings['progressReminders'] != false;
+
+        final savedInterval = settings['progressIntervalDays'];
+
+        final intervalDays =
+            savedInterval is int && [7, 14, 30].contains(savedInterval)
+            ? savedInterval
+            : 14;
+
+        return StreamBuilder<List<AppNotification>>(
+          stream: notificationService.watchNotifications(uid),
+          builder: (context, activitySnapshot) {
+            final unreadCount = communityEnabled
+                ? activitySnapshot.data
+                          ?.where((notification) => !notification.isRead)
+                          .length ??
+                      0
+                : 0;
+
+            return StreamBuilder<List<MyPlant>>(
+              stream: database.getMyPlants(uid),
+              builder: (context, plantSnapshot) {
+                return StreamBuilder<Map<String, String>>(
+                  stream: notificationService.watchDismissedReminders(uid),
+                  builder: (context, dismissedSnapshot) {
+                    final plants = plantSnapshot.data ?? <MyPlant>[];
+
+                    final dismissed =
+                        dismissedSnapshot.data ?? <String, String>{};
+
+                    final wateringCount = wateringEnabled
+                        ? reminderService
+                              .getWateringReminders(
+                                plants,
+                                dismissed: dismissed,
+                              )
+                              .length
+                        : 0;
+
+                    final progressCount = progressEnabled
+                        ? reminderService
+                              .getProgressReminders(
+                                plants,
+                                intervalDays: intervalDays,
+                                dismissed: dismissed,
+                              )
+                              .length
+                        : 0;
+
+                    final total = unreadCount + wateringCount + progressCount;
+
+                    return IconButton(
+                      tooltip: 'Notifications',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen(),
+                          ),
+                        );
+                      },
+                      icon: Badge(
+                        isLabelVisible: total > 0,
+                        label: Text(total > 99 ? '99+' : '$total'),
+                        child: Icon(
+                          Icons.notifications_outlined,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.primary
+                              : _forest,
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
-              icon: Badge(
-                isLabelVisible: total > 0,
-                label: Text(
-                  total > 99 ? '99+' : '$total',
-                ),
-                child: const Icon(
-                  Icons.notifications_outlined,
-                  color: _forest,
-                ),
-              ),
             );
           },
         );
