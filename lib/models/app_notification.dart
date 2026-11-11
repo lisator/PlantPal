@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// An activity record shown in PlantPal's in-app notifications inbox.
@@ -35,9 +34,7 @@ class AppNotification {
       id: document.id,
       type: (data['type'] ?? '').toString(),
       actorId: (data['actorId'] ?? '').toString(),
-      createdAt: timestamp is Timestamp
-          ? timestamp.toDate()
-          : null,
+      createdAt: timestamp is Timestamp ? timestamp.toDate() : null,
       isRead: data['isRead'] == true,
       postId: (data['postId'] ?? '').toString(),
       plantId: (data['plantId'] ?? '').toString(),

@@ -2,49 +2,54 @@ import 'package:flutter/material.dart';
 
 import '../models/my_plant.dart';
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
 import '../widgets/watering.dart';
-import 'home_screen.dart';
-import 'plant_details_screen.dart';
 import '../widgets/plant_care_guide.dart';
 
+import 'home_screen.dart';
+import 'plant_details_screen.dart';
 import 'analysis_plant_details_screen.dart';
 
-// PlantPal colors, same palette as the community screen.
-const Color _forest = Color(0xFF315F43);
-const Color _pale = Color(0xFFF6F8F2);
-const Color _mint = Color(0xFFE0EBDD);
-const Color _ink = Color(0xFF24372A);
+// Shared PlantPal colors.
+const Color _forest = PlantPalColors.forest;
 
-// Rounded card with a mint border and soft shadow, like the community posts.
-const RoundedRectangleBorder _cardShape = RoundedRectangleBorder(
-  borderRadius: BorderRadius.all(Radius.circular(20)),
-  side: BorderSide(color: _mint),
-);
-final Color _cardShadow = _forest.withValues(alpha: 0.12);
+// Card borders change based on the selected theme.
+RoundedRectangleBorder _cardShape(BuildContext context) {
+  return RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(20),
+    side: BorderSide(color: PlantPalColors.border(context)),
+  );
+}
 
-// Forest buttons, spinners, and text fields instead of Flutter's default
-// purple, like the community screen's own theme.
-ThemeData _screenTheme(ThemeData base) => base.copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _forest,
-        primary: _forest,
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: _forest),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: _forest,
-          foregroundColor: Colors.white,
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(foregroundColor: _forest),
-      ),
-    );
+// Preserve Light Mode or Dark Mode.
+ThemeData _screenTheme(ThemeData base) {
+  final isDark = base.brightness == Brightness.dark;
 
-/// Plants from search open the Perenual care page; plants saved from a photo
-/// analysis (no Perenual id) open the analysis details page.
+  final accent = isDark ? PlantPalColors.darkAccent : PlantPalColors.forest;
+
+  return base.copyWith(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: _forest,
+      brightness: base.brightness,
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: accent),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: _forest,
+        foregroundColor: Colors.white,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: accent),
+    ),
+  );
+}
+
+// Open the correct details screen for the saved plant.
+// Plants from search use Perenual details.
+// Plants saved from analysis use analysis details.
 void openMyPlantDetails(BuildContext context, MyPlant plant) {
   if (plant.perenualId != null) {
     openPlantDetailsPage(
@@ -58,25 +63,33 @@ void openMyPlantDetails(BuildContext context, MyPlant plant) {
 
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (context) => AnalysisPlantDetailsScreen(
-        plant: plant,
-      ),
+      builder: (context) => AnalysisPlantDetailsScreen(plant: plant),
     ),
   );
 }
 
-/// One-line summary, e.g. "4 plants · 1 needs water today".
-/// Used on My Plants and the Dashboard.
+// Summarize the user's saved plants.
+// Used here and on the Dashboard.
 String plantSummary(List<MyPlant> plants) {
-  if (plants.isEmpty) return 'No plants saved yet';
+  if (plants.isEmpty) {
+    return 'No plants saved yet';
+  }
+
   final count = '${plants.length} plant${plants.length == 1 ? '' : 's'}';
-  // due today or overdue; plants with no schedule don't count
-  final due = plants.where((p) => (p.daysUntilWatering() ?? 1) <= 0).length;
-  if (due == 0) return '$count · nothing to water today';
-  return '$count · $due need${due == 1 ? 's' : ''} water today';
+
+  final due = plants
+      .where((plant) => (plant.daysUntilWatering() ?? 1) <= 0)
+      .length;
+
+  if (due == 0) {
+    return '$count · nothing to water today';
+  }
+
+  return '$count · $due '
+      'need${due == 1 ? 's' : ''} water today';
 }
 
-/// My Plants tab: the user's saved plants, live from Firestore.
+// Main My Plants screen.
 class MyPlantsScreen extends StatefulWidget {
   const MyPlantsScreen({super.key});
 
@@ -86,38 +99,42 @@ class MyPlantsScreen extends StatefulWidget {
 
 class _MyPlantsScreenState extends State<MyPlantsScreen> {
   final String? _userId = currentUserId();
-  late final Stream<List<MyPlant>>? _plants =
-      _userId == null ? null : DatabaseService().getMyPlants(_userId);
 
-  /// Asks before removing a plant.
+  late final Stream<List<MyPlant>>? _plants = _userId == null
+      ? null
+      : DatabaseService().getMyPlants(_userId);
+
+  // Confirm before removing a plant.
   Future<void> _confirmRemove(String userId, MyPlant plant) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Remove plant?'),
         content: Text('Remove ${plant.displayName} from My Plants?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Remove'),
           ),
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
 
     try {
-      await DatabaseService().removeMyPlant(
-        userId: userId,
-        plantId: plant.id,
-      );
+      await DatabaseService().removeMyPlant(userId: userId, plantId: plant.id);
     } catch (e) {
       debugPrint('My Plants error: $e');
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not remove plant. Try again.')),
       );
@@ -128,114 +145,137 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
   Widget build(BuildContext context) {
     final userId = _userId;
 
-    // States: signed out, error, loading, empty, or the list.
     return Theme(
       data: _screenTheme(Theme.of(context)),
       child: ColoredBox(
-      color: _pale,
-      child: Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: userId == null
-            ? const MyPlantsMessage(
-                icon: Icons.lock_outline,
-                title: 'Sign in to see your plants',
-                message: 'My Plants is saved to your PlantPal account.',
-              )
-            : StreamBuilder<List<MyPlant>>(
-                stream: _plants,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    debugPrint('My Plants error: ${snapshot.error}');
-                    return const MyPlantsMessage(
-                      icon: Icons.cloud_off_outlined,
-                      title: 'Could not load your plants',
-                      message: 'Check your connection and try again.',
-                    );
-                  }
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+        color: PlantPalColors.background(context),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: userId == null
+                ? const MyPlantsMessage(
+                    icon: Icons.lock_outline,
+                    title: 'Sign in to see your plants',
+                    message: 'My Plants is saved to your PlantPal account.',
+                  )
+                : StreamBuilder<List<MyPlant>>(
+                    stream: _plants,
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        debugPrint('My Plants error: ${snapshot.error}');
 
-                  final plants = snapshot.data!;
-                  if (plants.isEmpty) {
-                    return MyPlantsMessage(
-                      icon: Icons.local_florist_outlined,
-                      title: 'No plants yet',
-                      message: 'Search for a plant and tap "Add to My Plants" '
-                          'to keep its care info here.',
-                      action: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _forest,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () =>
-                            HomeTabs.goTo(context, HomeTabs.search),
-                        icon: const Icon(Icons.search),
-                        label: const Text('Search plants'),
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: plants.length + 1,
-                    separatorBuilder: (context, index) =>
-                        SizedBox(height: index == 0 ? 16 : 12),
-                    itemBuilder: (context, index) {
-                      // First row is the title and summary.
-                      if (index == 0) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'My Plants',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(
-                                    color: _ink,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              plantSummary(plants),
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
+                        return const MyPlantsMessage(
+                          icon: Icons.cloud_off_outlined,
+                          title: 'Could not load your plants',
+                          message: 'Check your connection and try again.',
                         );
                       }
-                      final plant = plants[index - 1];
-                      return MyPlantCard(
-                        plant: plant,
-                        onTap: () => openMyPlantDetails(context, plant),
-                        onRemove: () =>
-                            _confirmRemove(userId, plant),
-                        onWatered: () => markPlantWatered(
-                          context,
-                          userId: userId,
-                          plant: plant,
-                        ),
-                        onEditSchedule: () => editWateringSchedule(
-                          context,
-                          userId: userId,
-                          plant: plant,
-                        ),
+
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final plants = snapshot.data!;
+
+                      // Empty collection.
+                      if (plants.isEmpty) {
+                        return MyPlantsMessage(
+                          icon: Icons.local_florist_outlined,
+                          title: 'No plants yet',
+                          message:
+                              'Search for a plant and tap '
+                              '"Add to My Plants" to keep '
+                              'its care info here.',
+                          action: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _forest,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () =>
+                                HomeTabs.goTo(context, HomeTabs.search),
+                            icon: const Icon(Icons.search),
+                            label: const Text('Search plants'),
+                          ),
+                        );
+                      }
+
+                      // Saved plants list.
+                      return ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: plants.length + 1,
+                        separatorBuilder: (context, index) =>
+                            SizedBox(height: index == 0 ? 16 : 12),
+                        itemBuilder: (context, index) {
+                          // Screen title and summary.
+                          if (index == 0) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'My Plants',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: PlantPalColors.text(context),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                Text(
+                                  plantSummary(plants),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: PlantPalColors.secondaryText(
+                                          context,
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            );
+                          }
+
+                          final plant = plants[index - 1];
+
+                          return MyPlantCard(
+                            plant: plant,
+
+                            // Open plant details.
+                            onTap: () => openMyPlantDetails(context, plant),
+
+                            // Remove plant.
+                            onRemove: () => _confirmRemove(userId, plant),
+
+                            // Mark plant as watered.
+                            onWatered: () => markPlantWatered(
+                              context,
+                              userId: userId,
+                              plant: plant,
+                            ),
+
+                            // Edit watering schedule.
+                            onEditSchedule: () => editWateringSchedule(
+                              context,
+                              userId: userId,
+                              plant: plant,
+                            ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-      ),
-      ),
+                  ),
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Card for a saved plant. [compact] is the small version used on the dashboard.
+// Individual saved plant card.
+// Compact mode is also used on the Dashboard.
 class MyPlantCard extends StatelessWidget {
   const MyPlantCard({
     super.key,
@@ -249,6 +289,7 @@ class MyPlantCard extends StatelessWidget {
 
   final MyPlant plant;
   final bool compact;
+
   final VoidCallback? onTap;
   final VoidCallback? onRemove;
   final VoidCallback? onWatered;
@@ -257,89 +298,134 @@ class MyPlantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
     final daysUntilWatering = plant.daysUntilWatering();
-    final subtitle =
-        plant.nickname != null ? plant.commonName : plant.scientificName;
+
+    final subtitle = plant.nickname != null
+        ? plant.commonName
+        : plant.scientificName;
+
+    // Theme colors.
+    final cardColor = PlantPalColors.card(context);
+
+    final textColor = PlantPalColors.text(context);
+
+    final secondaryText = PlantPalColors.secondaryText(context);
+
+    final accent = PlantPalColors.accent(context);
+
+    final border = PlantPalColors.border(context);
+
+    final isDark = PlantPalColors.isDark(context);
 
     return SizedBox(
       width: compact ? 248 : null,
       child: Card(
         margin: EdgeInsets.zero,
-        color: Colors.white,
+
+        // Dark green in dark mode, white in light mode.
+        color: cardColor,
+
         elevation: 1,
-        shadowColor: _cardShadow,
-        shape: _cardShape,
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.22 : 0.06),
+
+        shape: _cardShape(context),
         clipBehavior: Clip.antiAlias,
+
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: EdgeInsets.all(compact ? 14 : 16),
+
             child: Row(
               crossAxisAlignment: compact
                   ? CrossAxisAlignment.center
                   : CrossAxisAlignment.start,
+
               children: [
+                // Plant thumbnail.
                 PlantThumbnailWithFallback(
                   url: plant.imageUrl,
                   scientificName: plant.scientificName,
                   commonName: plant.commonName,
                   size: compact ? 40 : 72,
                 ),
+
                 SizedBox(width: compact ? 12 : 16),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
+
                     children: [
+                      // Plant name.
                       Text(
                         plant.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.titleMedium?.copyWith(
-                          color: _ink,
+                          color: textColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+
+                      // Plant species.
                       if (subtitle.isNotEmpty)
                         Text(
                           subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: secondaryText,
+                          ),
                         ),
+
                       if (!compact) ...[
+                        // Plant location.
                         if (plant.location != null) ...[
                           const SizedBox(height: 8),
+
                           _CardDetail(
                             icon: Icons.place_outlined,
                             text: plant.location!,
                           ),
                         ],
+
+                        // Watering information.
                         if (plant.wateringSummary != null) ...[
                           const SizedBox(height: 4),
+
                           _CardDetail(
                             icon: Icons.water_drop_outlined,
                             text: plant.wateringSummary!,
                           ),
                         ],
+
                         const SizedBox(height: 4),
-                        const Divider(height: 16, color: _mint),
-                        // Watering status, "Watered" button, and schedule.
+
+                        Divider(height: 16, color: border),
+
                         const SizedBox(height: 4),
+
+                        // Watering status and controls.
                         Wrap(
                           spacing: 8,
                           runSpacing: 4,
                           crossAxisAlignment: WrapCrossAlignment.center,
+
                           children: [
                             _WateringBadge(
                               text: wateringStatus(plant),
                               daysUntilWatering: daysUntilWatering,
                             ),
+
+                            // Watered button.
                             if (onWatered != null && daysUntilWatering != null)
                               TextButton.icon(
                                 style: TextButton.styleFrom(
-                                  foregroundColor: _forest,
+                                  foregroundColor: accent,
                                 ),
                                 onPressed: onWatered,
                                 icon: const Icon(
@@ -348,10 +434,12 @@ class MyPlantCard extends StatelessWidget {
                                 ),
                                 label: const Text('Watered'),
                               ),
+
+                            // Watering schedule button.
                             if (onEditSchedule != null)
                               TextButton(
                                 style: TextButton.styleFrom(
-                                  foregroundColor: _forest,
+                                  foregroundColor: accent,
                                 ),
                                 onPressed: onEditSchedule,
                                 child: Text(
@@ -366,16 +454,20 @@ class MyPlantCard extends StatelessWidget {
                     ],
                   ),
                 ),
+
+                // Remove button.
                 if (onRemove != null)
                   IconButton(
                     tooltip: 'Remove from My Plants',
-                    color: _forest,
+                    color: accent,
                     icon: const Icon(Icons.delete_outline),
                     onPressed: onRemove,
                   )
+                // Navigation arrow.
                 else if (onTap != null) ...[
                   const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right, color: _forest),
+
+                  Icon(Icons.chevron_right, color: accent),
                 ],
               ],
             ),
@@ -386,14 +478,9 @@ class MyPlantCard extends StatelessWidget {
   }
 }
 
-/// Pill showing when a plant needs water. Always dark text on a light pill
-/// (white text this small looks blurry on web): forest border when due
-/// today or overdue, mint when coming up, pale when there's no schedule.
+// Watering badge displayed on each plant card.
 class _WateringBadge extends StatelessWidget {
-  const _WateringBadge({
-    required this.text,
-    required this.daysUntilWatering,
-  });
+  const _WateringBadge({required this.text, required this.daysUntilWatering});
 
   final String text;
   final int? daysUntilWatering;
@@ -401,31 +488,38 @@ class _WateringBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final days = daysUntilWatering;
+
     final due = days != null && days <= 0;
-    final background = days == null ? _pale : _mint;
-    final foreground = due ? _forest : _ink;
+
+    final background = PlantPalColors.softBackground(context);
+
+    final foreground = PlantPalColors.text(context);
+
+    final borderColor = due
+        ? PlantPalColors.accent(context)
+        : PlantPalColors.border(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: due ? _forest : _mint,
-          width: due ? 1.5 : 1,
-        ),
+
+        border: Border.all(color: borderColor, width: due ? 1.5 : 1),
       ),
+
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.water_drop, size: 14, color: foreground),
+
           const SizedBox(width: 4),
+
           Text(
             text,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: foreground, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -433,7 +527,8 @@ class _WateringBadge extends StatelessWidget {
   }
 }
 
-/// Small icon + text line on a plant card (location, watering needs).
+// Displays small details such as plant location
+// and watering recommendations.
 class _CardDetail extends StatelessWidget {
   const _CardDetail({required this.icon, required this.text});
 
@@ -442,19 +537,22 @@ class _CardDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final secondaryText = PlantPalColors.secondaryText(context);
 
-    // muted icon, text cut off with "..." if too long
     return Row(
       children: [
-        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+        Icon(icon, size: 16, color: secondaryText),
+
         const SizedBox(width: 6),
+
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium,
+
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: secondaryText),
           ),
         ),
       ],
@@ -462,7 +560,8 @@ class _CardDetail extends StatelessWidget {
   }
 }
 
-/// Centered icon and text for the signed-out, error and empty states.
+// Reusable message for empty, loading,
+// signed-out, or error states.
 class MyPlantsMessage extends StatelessWidget {
   const MyPlantsMessage({
     super.key,
@@ -479,28 +578,40 @@ class MyPlantsMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = PlantPalColors.text(context);
+
+    final secondaryText = PlantPalColors.secondaryText(context);
+
+    final accent = PlantPalColors.accent(context);
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
+
         child: Column(
           mainAxisSize: MainAxisSize.min,
+
           children: [
-            Icon(icon, size: 48, color: _forest),
+            Icon(icon, size: 48, color: accent),
+
             const SizedBox(height: 12),
+
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: _ink),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(color: textColor, fontWeight: FontWeight.bold),
             ),
+
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              action!,
-            ],
+
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: secondaryText),
+            ),
+
+            if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),
       ),

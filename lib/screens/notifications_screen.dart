@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,56 +6,134 @@ import '../models/app_notification.dart';
 import '../models/my_plant.dart';
 import '../services/database_service.dart';
 import '../services/notification_service.dart';
-import '../widgets/watering.dart';
+import '../services/plant_reminder_service.dart';
 
 import 'home_screen.dart';
+import 'my_plants_screen.dart';
 import 'user_profile_screen.dart';
 
-// Information used to display a detailed notification.
-class _NotificationDetails {
-  final String actorName;
-  final String actorPhoto;
-  final String postTitle;
-  final String preview;
-  final String plantName;
-
-  const _NotificationDetails({
-    this.actorName = 'Someone',
-    this.actorPhoto = '',
+// Extra information displayed inside activity notifications.
+class _ActivityDetails {
+  const _ActivityDetails({
+    this.name = 'Someone',
+    this.photoUrl = '',
     this.postTitle = '',
     this.preview = '',
     this.plantName = '',
   });
+
+  final String name;
+  final String photoUrl;
+  final String postTitle;
+  final String preview;
+  final String plantName;
 }
 
-// Display Community notifications and plant watering reminders.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() =>
-      _NotificationsScreenState();
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  // PlantPal colors.
   static const Color _forest = Color(0xFF315F43);
-  static const Color _pale = Color(0xFFF6F8F2);
-  static const Color _mint = Color(0xFFE0EBDD);
-  static const Color _ink = Color(0xFF24372A);
+
+  final NotificationService _notifications = NotificationService();
+
+  final PlantReminderService _reminders = PlantReminderService();
+
+  final DatabaseService _database = DatabaseService();
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final NotificationService _notificationService =
-      NotificationService();
-  final DatabaseService _databaseService = DatabaseService();
 
-  // Store notification lookups so they are not repeated
-  // every time Flutter rebuilds the screen.
-  final Map<String, Future<_NotificationDetails>>
-      _detailsCache = {};
+  final Set<String> _selected = {};
 
-  // Choose an icon based on the notification type.
-  IconData _notificationIcon(String type) {
+  final Map<String, Future<_ActivityDetails>> _detailsCache = {};
+
+  bool _selectionMode = false;
+  bool _deleting = false;
+
+  String? _streamUserId;
+
+  Stream<List<MyPlant>>? _plantStream;
+  Stream<List<AppNotification>>? _activityStream;
+  Stream<Map<String, String>>? _dismissedStream;
+
+  Stream<DocumentSnapshot<Map<String, dynamic>>>? _settingsStream;
+
+  // Theme-aware colors for light and dark mode.
+  Color get _background => Theme.of(context).scaffoldBackgroundColor;
+
+  Color get _cardColor => Theme.of(context).colorScheme.surface;
+
+  Color get _textColor => Theme.of(context).colorScheme.onSurface;
+
+  Color get _primaryColor => Theme.of(context).colorScheme.primary;
+
+  Color get _softColor => Theme.of(context).colorScheme.primaryContainer;
+
+  Color get _borderColor => Theme.of(context).colorScheme.outlineVariant;
+
+  // Set up the Firestore streams for the signed-in user.
+  void _initializeStreams(String userId) {
+    if (_streamUserId == userId) return;
+
+    _streamUserId = userId;
+
+    _plantStream = _database.getMyPlants(userId);
+
+    _activityStream = _notifications.watchNotifications(userId);
+
+    _dismissedStream = _notifications.watchDismissedReminders(userId);
+
+    _settingsStream = _db.collection('users').doc(userId).snapshots();
+
+    _detailsCache.clear();
+    _selected.clear();
+  }
+
+  void _message(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _activityKey(String id) => 'activity|$id';
+
+  // Add or remove one notification from selection.
+  void _toggleSelected(String key) {
+    setState(() {
+      if (!_selected.add(key)) {
+        _selected.remove(key);
+      }
+    });
+  }
+
+  // Leave selection mode.
+  void _exitSelection() {
+    setState(() {
+      _selectionMode = false;
+      _selected.clear();
+    });
+  }
+
+  // Select all visible notifications or deselect them.
+  void _selectAll(List<String> keys) {
+    setState(() {
+      if (keys.isNotEmpty && keys.every(_selected.contains)) {
+        _selected.clear();
+      } else {
+        _selected
+          ..clear()
+          ..addAll(keys);
+      }
+    });
+  }
+
+  // Choose an icon based on activity type.
+  IconData _activityIcon(String type) {
     switch (type) {
       case 'follow':
         return Icons.person_add_alt_1;
@@ -75,13 +152,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // Choose a title based on the notification type.
-  String _notificationTitle(String type) {
+  // Choose the heading for an activity notification.
+  String _activityTitle(String type) {
     switch (type) {
       case 'follow':
         return 'New follower';
       case 'like':
-        return 'New post like';
+        return 'New like';
       case 'comment':
         return 'New comment';
       case 'reply':
@@ -91,59 +168,50 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'new_post':
         return 'New Community post';
       default:
-        return 'PlantPal activity';
+        return 'PlantPal notification';
     }
   }
 
-  // Find details related to the notification.
-  Future<_NotificationDetails> _loadDetails(
+  // Load extra information about a notification.
+  Future<_ActivityDetails> _loadDetails(
     AppNotification notification,
     String userId,
   ) async {
-    String actorName = 'Someone';
-    String actorPhoto = '';
+    String name = 'Someone';
+    String photoUrl = '';
     String postTitle = '';
     String preview = '';
     String plantName = '';
 
-    // Get the username and profile picture.
-    if (notification.actorId.isNotEmpty &&
-        notification.type != 'analysis') {
+    // Load the actor's username and profile picture.
+    if (notification.actorId.isNotEmpty && notification.type != 'analysis') {
       try {
-        final actor = await _db
+        final doc = await _db
             .collection('users')
             .doc(notification.actorId)
             .get();
 
-        final data = actor.data();
+        final data = doc.data() ?? {};
 
-        if (data != null) {
-          final username =
-              (data['username'] ?? '').toString().trim();
+        final username = (data['username'] ?? '').toString().trim();
 
-          final displayName =
-              (data['displayName'] ?? '').toString().trim();
+        final displayName = (data['displayName'] ?? '').toString().trim();
 
-          final email =
-              (data['email'] ?? '').toString().trim();
+        final email = (data['email'] ?? '').toString().trim();
 
-          if (username.isNotEmpty) {
-            actorName = username;
-          } else if (displayName.isNotEmpty) {
-            actorName = displayName;
-          } else if (email.isNotEmpty) {
-            actorName = email.split('@').first;
-          }
+        name = username.isNotEmpty
+            ? username
+            : displayName.isNotEmpty
+            ? displayName
+            : email.isNotEmpty
+            ? email.split('@').first
+            : 'Someone';
 
-          actorPhoto =
-              (data['photoUrl'] ?? '').toString().trim();
-        }
-      } catch (_) {
-        // Keep a general name if the user cannot be loaded.
-      }
+        photoUrl = (data['photoUrl'] ?? '').toString().trim();
+      } catch (_) {}
     }
 
-    // Get the title of the related Community post.
+    // Load the related Community post title.
     if (notification.postId.isNotEmpty) {
       try {
         final post = await _db
@@ -151,18 +219,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .doc(notification.postId)
             .get();
 
-        final data = post.data();
-
-        if (data != null) {
-          postTitle =
-              (data['title'] ?? '').toString().trim();
-        }
-      } catch (_) {
-        // The post may have been removed.
-      }
+        postTitle = (post.data()?['title'] ?? '').toString().trim();
+      } catch (_) {}
     }
 
-    // Get the comment text for a comment notification.
+    // Load a comment preview.
     if (notification.type == 'comment' &&
         notification.postId.isNotEmpty &&
         notification.commentId.isNotEmpty) {
@@ -174,16 +235,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .doc(notification.commentId)
             .get();
 
-        preview =
-            (comment.data()?['comment'] ?? '')
-                .toString()
-                .trim();
-      } catch (_) {
-        // The comment may no longer exist.
-      }
+        preview = (comment.data()?['comment'] ?? '').toString().trim();
+      } catch (_) {}
     }
 
-    // Get the reply text for a reply notification.
+    // Load a reply preview.
     if (notification.type == 'reply' &&
         notification.postId.isNotEmpty &&
         notification.commentId.isNotEmpty &&
@@ -198,18 +254,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .doc(notification.replyId)
             .get();
 
-        preview =
-            (reply.data()?['reply'] ?? '')
-                .toString()
-                .trim();
-      } catch (_) {
-        // The reply may have been removed.
-      }
+        preview = (reply.data()?['reply'] ?? '').toString().trim();
+      } catch (_) {}
     }
 
-    // Get the saved plant name for analysis notifications.
-    if (notification.type == 'analysis' &&
-        notification.plantId.isNotEmpty) {
+    // Load the name of the plant related to an analysis.
+    if (notification.type == 'analysis' && notification.plantId.isNotEmpty) {
       try {
         final plant = await _db
             .collection('users')
@@ -218,44 +268,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .doc(notification.plantId)
             .get();
 
-        final data = plant.data();
+        final data = plant.data() ?? {};
 
-        if (data != null) {
-          final customName =
-              (data['nickname'] ?? '').toString().trim();
-
-          final commonName =
-              (data['commonName'] ?? '').toString().trim();
-
-          final scientificName =
-              (data['scientificName'] ?? '')
-                  .toString()
-                  .trim();
-
-          if (customName.isNotEmpty) {
-            plantName = customName;
-          } else if (commonName.isNotEmpty) {
-            plantName = commonName;
-          } else if (scientificName.isNotEmpty) {
-            plantName = scientificName;
-          }
-        }
-      } catch (_) {
-        // Use a general description if unavailable.
-      }
+        plantName =
+            [data['nickname'], data['commonName'], data['scientificName']]
+                .map((value) => (value ?? '').toString().trim())
+                .firstWhere((value) => value.isNotEmpty, orElse: () => '');
+      } catch (_) {}
     }
 
-    return _NotificationDetails(
-      actorName: actorName,
-      actorPhoto: actorPhoto,
+    return _ActivityDetails(
+      name: name,
+      photoUrl: photoUrl,
       postTitle: postTitle,
       preview: preview,
       plantName: plantName,
     );
   }
 
-  // Reuse previously loaded notification information.
-  Future<_NotificationDetails> _detailsFor(
+  // Cache activity details so they aren't loaded repeatedly.
+  Future<_ActivityDetails> _detailsFor(
     AppNotification notification,
     String userId,
   ) {
@@ -265,363 +297,625 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // Explain exactly who did what.
-  String _notificationMessage(
+  // Build a readable message based on activity type.
+  String _activityMessage(
     AppNotification notification,
-    _NotificationDetails details,
+    _ActivityDetails details,
   ) {
-    final name = details.actorName;
-    final postTitle = details.postTitle;
+    final name = details.name;
+    final title = details.postTitle;
 
     switch (notification.type) {
       case 'follow':
         return '$name started following you.';
 
       case 'like':
-        if (postTitle.isNotEmpty) {
-          return '$name liked your post "$postTitle".';
-        }
-        return '$name liked your Community post.';
+        return title.isEmpty
+            ? '$name liked your post.'
+            : '$name liked "$title".';
 
       case 'comment':
-        if (postTitle.isNotEmpty) {
-          return '$name commented on your post "$postTitle".';
-        }
-        return '$name commented on your post.';
+        return title.isEmpty
+            ? '$name commented on your post.'
+            : '$name commented on "$title".';
 
       case 'reply':
-        if (postTitle.isNotEmpty) {
-          return '$name replied to your comment on "$postTitle".';
-        }
-        return '$name replied to your comment.';
+        return title.isEmpty
+            ? '$name replied to your comment.'
+            : '$name replied to your comment on "$title".';
 
       case 'analysis':
-        if (details.plantName.isNotEmpty) {
-          return 'A plant health analysis was saved for '
-              '"${details.plantName}".';
-        }
-        return 'A plant health analysis was saved to My Plants.';
+        return details.plantName.isEmpty
+            ? 'Your plant analysis was saved.'
+            : 'Analysis saved for ${details.plantName}.';
 
       case 'new_post':
-        if (postTitle.isNotEmpty) {
-          return '$name shared a new Community post '
-              '"$postTitle".';
-        }
-        return '$name shared a new Community post.';
+        return title.isEmpty
+            ? '$name shared a new post.'
+            : '$name shared "$title".';
 
       default:
-        return 'You have new activity in PlantPal.';
+        return 'You have new PlantPal activity.';
     }
   }
 
-  // Display a short preview of a comment or reply.
-  String _previewText(String text) {
+  // Keep comment previews short.
+  String _shortPreview(String value) {
+    final text = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+
     if (text.isEmpty) return '';
 
-    final clean = text.replaceAll(RegExp(r'\s+'), ' ');
-
-    if (clean.length > 120) {
-      return '"${clean.substring(0, 120)}..."';
-    }
-
-    return '"$clean"';
+    return text.length > 120 ? '"${text.substring(0, 120)}..."' : '"$text"';
   }
 
-  // Show when the notification was created.
-  String _timeAgo(DateTime? createdAt) {
-    if (createdAt == null) return 'Just now';
+  // Convert timestamps into readable times.
+  String _timeAgo(DateTime? date) {
+    if (date == null) return 'Just now';
 
-    final difference = DateTime.now().difference(createdAt);
+    final difference = DateTime.now().difference(date);
 
-    if (difference.isNegative ||
-        difference.inSeconds < 60) {
+    if (difference.isNegative || difference.inMinutes < 1) {
       return 'Just now';
     }
 
     if (difference.inMinutes < 60) {
-      final minutes = difference.inMinutes;
-      return '$minutes min ago';
+      return '${difference.inMinutes} min ago';
     }
 
     if (difference.inHours < 24) {
-      final hours = difference.inHours;
-      return '$hours hr ago';
+      return '${difference.inHours} hr ago';
     }
 
     if (difference.inDays < 7) {
-      final days = difference.inDays;
-      return days == 1
+      return difference.inDays == 1
           ? 'Yesterday'
-          : '$days days ago';
+          : '${difference.inDays} days ago';
     }
 
-    // Show the date for older notifications.
-    final month = createdAt.month.toString().padLeft(2, '0');
-    final day = createdAt.day.toString().padLeft(2, '0');
-
-    return '$month/$day/${createdAt.year}';
+    return '${date.month}/${date.day}/${date.year}';
   }
 
-  // Open the related screen after tapping a notification.
-  Future<void> _openNotification(
-    BuildContext context,
+  // Open the specific plant associated with a reminder.
+  Future<void> _openPlant(String userId, String plantId) async {
+    try {
+      final doc = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('myPlants')
+          .doc(plantId)
+          .get();
+
+      if (!mounted) return;
+
+      if (!doc.exists) {
+        _message('This plant is no longer available.');
+        return;
+      }
+
+      final plant = MyPlant.fromFirestore({...doc.data()!, 'id': doc.id});
+
+      openMyPlantDetails(context, plant);
+    } catch (e) {
+      _message('Unable to open plant: $e');
+    }
+  }
+
+  // Open the content related to an activity notification.
+  Future<void> _openActivity(
     String userId,
     AppNotification notification,
   ) async {
-    // Mark the notification as read.
     try {
-      await _notificationService.markRead(
-        userId,
-        notification.id,
-      );
-    } catch (error) {
-      debugPrint(
-        'Unable to mark notification as read: $error',
-      );
-    }
+      await _notifications.markRead(userId, notification.id);
+    } catch (_) {}
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
-    // A new follower opens that person's profile.
-    if (notification.type == 'follow' &&
-        notification.actorId.isNotEmpty) {
+    if (notification.type == 'follow' && notification.actorId.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => UserProfileScreen(
-            userId: notification.actorId,
-          ),
+          builder: (context) => UserProfileScreen(userId: notification.actorId),
         ),
       );
       return;
     }
 
-    // A plant analysis opens My Plants.
-    if (notification.type == 'analysis') {
-      HomeTabs.goTo(context, HomeTabs.myPlants);
+    if (notification.type == 'analysis' && notification.plantId.isNotEmpty) {
+      await _openPlant(userId, notification.plantId);
       return;
     }
 
-    // Likes, comments, replies, and new posts open Community.
     HomeTabs.goTo(context, HomeTabs.community);
   }
 
-  // Show a user's profile picture or the activity icon.
-  Widget _notificationAvatar(
-    AppNotification notification,
-    _NotificationDetails details,
-  ) {
-    if (details.actorPhoto.isNotEmpty &&
-        notification.type != 'analysis') {
-      return CircleAvatar(
-        backgroundColor: Colors.white,
-        backgroundImage: NetworkImage(
-          details.actorPhoto,
-        ),
-      );
-    }
+  // Display one watering or progress reminder card.
+  Widget _reminderCard(String userId, PlantCareReminder reminder) {
+    final key = reminder.selectionKey;
+    final selected = _selected.contains(key);
 
-    return CircleAvatar(
-      backgroundColor: Colors.white,
-      child: Icon(
-        _notificationIcon(notification.type),
-        color: _forest,
+    return Card(
+      color: selected ? _softColor : _cardColor,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 9),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: selected ? _primaryColor : _borderColor),
+      ),
+      child: ListTile(
+        onLongPress: _deleting
+            ? null
+            : () {
+                setState(() => _selectionMode = true);
+                _toggleSelected(key);
+              },
+        onTap: _selectionMode
+            ? () => _toggleSelected(key)
+            : () => _openPlant(userId, reminder.plant.id),
+        leading: _selectionMode
+            ? Checkbox(
+                value: selected,
+                onChanged: _deleting ? null : (_) => _toggleSelected(key),
+              )
+            : CircleAvatar(
+                backgroundColor: _softColor,
+                child: Icon(
+                  reminder.type == 'watering'
+                      ? Icons.water_drop_outlined
+                      : Icons.camera_alt_outlined,
+                  color: _primaryColor,
+                ),
+              ),
+        title: Text(
+          reminder.plant.displayName,
+          style: TextStyle(color: _textColor, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(reminder.message),
+        trailing: _selectionMode ? null : const Icon(Icons.chevron_right),
       ),
     );
   }
 
-  // Build one detailed notification.
-  Widget _notificationCard({
-    required BuildContext context,
-    required String userId,
-    required AppNotification notification,
-  }) {
-    return FutureBuilder<_NotificationDetails>(
+  // Display one stored Community or activity notification.
+  Widget _activityCard(String userId, AppNotification notification) {
+    final key = _activityKey(notification.id);
+    final selected = _selected.contains(key);
+
+    return FutureBuilder<_ActivityDetails>(
       future: _detailsFor(notification, userId),
       builder: (context, snapshot) {
-        final details =
-            snapshot.data ?? const _NotificationDetails();
+        final details = snapshot.data ?? const _ActivityDetails();
 
-        final message =
-            _notificationMessage(notification, details);
-
-        final preview = _previewText(details.preview);
+        final preview = _shortPreview(details.preview);
 
         return Card(
-          color: notification.isRead
-              ? Colors.white
-              : _mint,
+          color: selected || !notification.isRead ? _softColor : _cardColor,
           elevation: 0,
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 9),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: selected ? _primaryColor : _borderColor),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 10,
+              horizontal: 12,
+              vertical: 7,
             ),
-            leading: _notificationAvatar(
-              notification,
-              details,
-            ),
-            title: Text(
-              _notificationTitle(notification.type),
-              style: const TextStyle(
-                color: _forest,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 14,
-                    ),
+            onLongPress: _deleting
+                ? null
+                : () {
+                    setState(() => _selectionMode = true);
+                    _toggleSelected(key);
+                  },
+            onTap: _selectionMode
+                ? () => _toggleSelected(key)
+                : () => _openActivity(userId, notification),
+            leading: _selectionMode
+                ? Checkbox(
+                    value: selected,
+                    onChanged: _deleting ? null : (_) => _toggleSelected(key),
+                  )
+                : CircleAvatar(
+                    backgroundColor: _cardColor,
+                    backgroundImage: details.photoUrl.isNotEmpty
+                        ? NetworkImage(details.photoUrl)
+                        : null,
+                    child: details.photoUrl.isEmpty
+                        ? Icon(
+                            _activityIcon(notification.type),
+                            color: _primaryColor,
+                          )
+                        : null,
                   ),
+            title: Text(
+              _activityTitle(notification.type),
+              style: TextStyle(color: _textColor, fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
 
-                  // Comment or reply preview.
-                  if (preview.isNotEmpty) ...[
-                    const SizedBox(height: 5),
-                    Text(
-                      preview,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: _ink.withValues(alpha: 0.75),
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
+                Text(_activityMessage(notification, details)),
 
-                  const SizedBox(height: 7),
-
+                if (preview.isNotEmpty) ...[
+                  const SizedBox(height: 5),
                   Text(
-                    _timeAgo(notification.createdAt),
-                    style: TextStyle(
-                      color: _forest.withValues(alpha: 0.75),
-                      fontSize: 12,
-                    ),
+                    preview,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
                 ],
-              ),
+
+                const SizedBox(height: 6),
+
+                Text(
+                  _timeAgo(notification.createdAt),
+                  style: TextStyle(color: _primaryColor, fontSize: 12),
+                ),
+              ],
             ),
-            trailing: notification.isRead
-                ? const Icon(
-                    Icons.chevron_right,
-                    color: _forest,
-                  )
-                : const Icon(
-                    Icons.circle,
-                    color: _forest,
-                    size: 10,
+            trailing: _selectionMode
+                ? null
+                : IconButton(
+                    tooltip: 'Delete notification',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: _deleting
+                        ? null
+                        : () => _confirmDelete(userId, [key], const []),
                   ),
-            onTap: () {
-              _openNotification(
-                context,
-                userId,
-                notification,
-              );
-            },
           ),
         );
       },
     );
   }
 
-  // Show plants needing water today or overdue.
-  Widget _wateringReminders(
-    BuildContext context,
+  // Confirm and process notification deletion.
+  Future<void> _confirmDelete(
     String userId,
+    List<String> selectedKeys,
+    List<PlantCareReminder> reminders,
+  ) async {
+    if (selectedKeys.isEmpty || _deleting) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete notifications?'),
+        content: Text(
+          'Remove ${selectedKeys.length} selected '
+          '${selectedKeys.length == 1 ? 'notification' : 'notifications'}? '
+          'Plant reminders will be dismissed for '
+          'their current reminder cycle.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+
+    try {
+      final activityIds = <String>[];
+      final plantSelections = <PlantReminderSelection>[];
+
+      for (final key in selectedKeys) {
+        if (key.startsWith('activity|')) {
+          activityIds.add(key.substring('activity|'.length));
+        } else {
+          for (final reminder in reminders) {
+            if (reminder.selectionKey == key) {
+              plantSelections.add(reminder.selection);
+              break;
+            }
+          }
+        }
+      }
+
+      await _notifications.deleteSelected(
+        userId: userId,
+        activityIds: activityIds,
+        reminders: plantSelections,
+      );
+
+      if (!mounted) return;
+
+      for (final id in activityIds) {
+        _detailsCache.remove('${userId}_$id');
+      }
+
+      setState(() {
+        _selected.removeAll(selectedKeys);
+
+        if (_selected.isEmpty) {
+          _selectionMode = false;
+        }
+      });
+
+      _message('Selected notifications removed.');
+    } catch (e) {
+      _message('Unable to delete notifications: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _deleting = false);
+      }
+    }
+  }
+
+  // Section heading.
+  Widget _sectionTitle(String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 15, bottom: 10),
+      child: Text(
+        value,
+        style: TextStyle(
+          color: _textColor,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // Read the saved settings and build notification sections.
+  Widget _notificationContent(
+    String userId,
+    List<MyPlant> plants,
+    Map<String, String> dismissed,
+    List<AppNotification> activities,
+    Map<String, dynamic> settings,
   ) {
-    return StreamBuilder<List<MyPlant>>(
-      stream: _databaseService.getMyPlants(userId),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Text(
-            'Unable to load watering reminders.',
-          );
-        }
+    final communityEnabled = settings['communityNotifications'] != false;
 
-        if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(
-              color: _forest,
+    final wateringEnabled = settings['wateringReminders'] != false;
+
+    final progressEnabled = settings['progressReminders'] != false;
+
+    final savedInterval = settings['progressIntervalDays'];
+
+    final intervalDays =
+        savedInterval is int && [7, 14, 30].contains(savedInterval)
+        ? savedInterval
+        : 14;
+
+    // Only calculate enabled reminder categories.
+    final watering = wateringEnabled
+        ? _reminders.getWateringReminders(plants, dismissed: dismissed)
+        : <PlantCareReminder>[];
+
+    final progress = progressEnabled
+        ? _reminders.getProgressReminders(
+            plants,
+            intervalDays: intervalDays,
+            dismissed: dismissed,
+          )
+        : <PlantCareReminder>[];
+
+    // Hide Community notifications when disabled.
+    final visibleActivities = communityEnabled
+        ? activities.where((activity) => activity.type != 'analysis').toList()
+        : <AppNotification>[];
+
+    // Plant analysis notifications remain separate
+    // from the Community preference.
+    final analysisActivities = activities
+        .where((activity) => activity.type == 'analysis')
+        .toList();
+
+    final allActivities = [...visibleActivities, ...analysisActivities];
+
+    final allReminders = [...watering, ...progress];
+
+    final allKeys = [
+      ...allReminders.map((reminder) => reminder.selectionKey),
+      ...allActivities.map((activity) => _activityKey(activity.id)),
+    ];
+
+    final selectedKeys = allKeys.where(_selected.contains).toList();
+
+    final allSelected = allKeys.isNotEmpty && allKeys.every(_selected.contains);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 30),
+      children: [
+        if (_selectionMode) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _softColor,
+              borderRadius: BorderRadius.circular(14),
             ),
-          );
-        }
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${selectedKeys.length} selected',
+                    style: TextStyle(
+                      color: _textColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _deleting ? null : () => _selectAll(allKeys),
+                  child: Text(allSelected ? 'Deselect All' : 'Select All'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
 
-        // Find plants that need watering.
-        final duePlants = snapshot.data!.where((plant) {
-          final days = plant.daysUntilWatering();
-          return days != null && days <= 0;
-        }).toList();
+        // WATERING REMINDERS
+        if (wateringEnabled) ...[
+          _sectionTitle('Watering Reminders'),
 
-        // Show the most overdue plants first.
-        duePlants.sort((a, b) {
-          return a.daysUntilWatering()!.compareTo(
-            b.daysUntilWatering()!,
-          );
-        });
+          if (watering.isEmpty) const Text('No watering reminders are due.'),
 
-        if (duePlants.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 12),
+          ...watering.map((reminder) => _reminderCard(userId, reminder)),
+        ],
+
+        // PLANT PROGRESS REMINDERS
+        if (progressEnabled) ...[
+          _sectionTitle('Plant Progress'),
+
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'All caught up! No plants need watering today.',
-              style: TextStyle(color: _ink),
+              'Progress reminders are currently set '
+              'to every $intervalDays days.',
+              style: const TextStyle(fontSize: 12),
             ),
-          );
+          ),
+
+          if (progress.isEmpty)
+            const Text('No plant progress updates are due.'),
+
+          ...progress.map((reminder) => _reminderCard(userId, reminder)),
+        ],
+
+        // ACTIVITY NOTIFICATIONS
+        if (communityEnabled || analysisActivities.isNotEmpty) ...[
+          _sectionTitle('Activity'),
+
+          if (allActivities.isEmpty)
+            const Text('No activity notifications yet.'),
+
+          ...allActivities.map((activity) => _activityCard(userId, activity)),
+        ],
+
+        if (!wateringEnabled &&
+            !progressEnabled &&
+            !communityEnabled &&
+            analysisActivities.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 25),
+            child: Center(
+              child: Text(
+                'Your notification categories are disabled. '
+                'You can enable them in Settings.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+
+        // BULK DELETION BUTTON
+        if (_selectionMode) ...[
+          const SizedBox(height: 20),
+
+          FilledButton.icon(
+            onPressed: _deleting || selectedKeys.isEmpty
+                ? null
+                : () => _confirmDelete(userId, selectedKeys, allReminders),
+            icon: _deleting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.delete_outline),
+            label: Text(
+              _deleting
+                  ? 'Deleting...'
+                  : 'Delete Selected (${selectedKeys.length})',
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Read settings while maintaining the existing
+  // plant, activity, and dismissal streams.
+  Widget _buildNotificationStreams(String userId) {
+    return StreamBuilder<List<MyPlant>>(
+      stream: _plantStream,
+      builder: (context, plantSnapshot) {
+        if (plantSnapshot.hasError) {
+          return const Center(child: Text('Unable to load saved plants.'));
         }
 
-        return Column(
-          children: duePlants.map((plant) {
-            return Card(
-              color: _mint,
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.water_drop_outlined,
-                    color: _forest,
-                  ),
+        if (!plantSnapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return StreamBuilder<Map<String, String>>(
+          stream: _dismissedStream,
+          builder: (context, dismissedSnapshot) {
+            if (dismissedSnapshot.hasError) {
+              return const Center(
+                child: Text(
+                  'Unable to load dismissed reminders. '
+                  'Check Firestore permissions.',
                 ),
-                title: Text(
-                  plant.displayName,
-                  style: const TextStyle(
-                    color: _forest,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Text(
-                  wateringStatus(plant),
-                  style: const TextStyle(color: _ink),
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: _forest,
-                ),
-                onTap: () {
-                  HomeTabs.goTo(
-                    context,
-                    HomeTabs.myPlants,
+              );
+            }
+
+            if (!dismissedSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            return StreamBuilder<List<AppNotification>>(
+              stream: _activityStream,
+              builder: (context, activitySnapshot) {
+                if (activitySnapshot.hasError) {
+                  return const Center(
+                    child: Text('Unable to load activity notifications.'),
                   );
-                },
-              ),
+                }
+
+                if (!activitySnapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                // New settings stream.
+                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: _settingsStream,
+                  builder: (context, settingsSnapshot) {
+                    if (settingsSnapshot.hasError) {
+                      return const Center(
+                        child: Text('Unable to load notification preferences.'),
+                      );
+                    }
+
+                    if (!settingsSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final userData = settingsSnapshot.data?.data();
+
+                    final rawSettings = userData?['settings'];
+
+                    final settings = rawSettings is Map
+                        ? Map<String, dynamic>.from(rawSettings)
+                        : <String, dynamic>{};
+
+                    return _notificationContent(
+                      userId,
+                      plantSnapshot.data!,
+                      dismissedSnapshot.data!,
+                      activitySnapshot.data!,
+                      settings,
+                    );
+                  },
+                );
+              },
             );
-          }).toList(),
+          },
         );
       },
     );
@@ -629,148 +923,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
-    if (currentUser == null) {
+    if (user == null) {
       return const Scaffold(
-        body: Center(
-          child: Text(
-            'Please log in to view notifications.',
-          ),
-        ),
+        body: Center(child: Text('Please sign in to view notifications.')),
       );
     }
 
-    final userId = currentUser.uid;
+    final userId = user.uid;
 
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _forest,
+    _initializeStreams(userId);
+
+    return Scaffold(
+      backgroundColor: _background,
+      appBar: AppBar(
+        title: const Text(
+          'Notifications',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-      ),
-      child: Scaffold(
-        backgroundColor: _pale,
-        appBar: AppBar(
-          title: const Text(
-            'Notifications',
-            style: TextStyle(
-              color: _forest,
-              fontWeight: FontWeight.bold,
-            ),
+        centerTitle: true,
+        actions: [
+          TextButton(
+            onPressed: _deleting
+                ? null
+                : () {
+                    if (_selectionMode) {
+                      _exitSelection();
+                    } else {
+                      setState(() => _selectionMode = true);
+                    }
+                  },
+            child: Text(_selectionMode ? 'Cancel' : 'Select'),
           ),
-          centerTitle: true,
-          backgroundColor: _pale,
-          foregroundColor: _forest,
-          surfaceTintColor: _pale,
-          actions: [
-            // Mark all notifications as read.
-            TextButton(
-              onPressed: () async {
-                try {
-                  await _notificationService
-                      .markAllRead(userId);
-                } catch (error) {
-                  if (!context.mounted) return;
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Unable to mark notifications as read.',
-                      ),
-                    ),
-                  );
+          if (!_selectionMode)
+            PopupMenuButton<String>(
+              tooltip: 'Notification options',
+              onSelected: (value) async {
+                if (value == 'read') {
+                  try {
+                    await _notifications.markAllRead(userId);
+                  } catch (e) {
+                    _message('Unable to mark all read: $e');
+                  }
                 }
               },
-              child: const Text(
-                'Mark all read',
-                style: TextStyle(color: _forest),
-              ),
-            ),
-          ],
-        ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 700,
-            ),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Plant watering section.
-                const Text(
-                  'Plant Care',
-                  style: TextStyle(
-                    color: _forest,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                _wateringReminders(
-                  context,
-                  userId,
-                ),
-
-                const SizedBox(height: 20),
-
-                // Community and analysis notifications.
-                const Text(
-                  'Activity',
-                  style: TextStyle(
-                    color: _forest,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                StreamBuilder<List<AppNotification>>(
-                  stream: _notificationService
-                      .watchNotifications(userId),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return const Text(
-                        'Unable to load notifications. '
-                        'Please check Firebase permissions.',
-                      );
-                    }
-
-                    if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: _forest,
-                        ),
-                      );
-                    }
-
-                    final notifications = snapshot.data!;
-
-                    if (notifications.isEmpty) {
-                      return const Text(
-                        'No activity notifications yet.',
-                        style: TextStyle(color: _ink),
-                      );
-                    }
-
-                    return Column(
-                      children: notifications.map((notification) {
-                        return _notificationCard(
-                          context: context,
-                          userId: userId,
-                          notification: notification,
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'read', child: Text('Mark all read')),
               ],
             ),
-          ),
+        ],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: _buildNotificationStreams(userId),
         ),
       ),
     );

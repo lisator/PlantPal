@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-class PlantPalAppBar extends StatelessWidget
-    implements PreferredSizeWidget {
+class PlantPalAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final bool showBackButton;
 
@@ -37,9 +36,7 @@ class PlantPalAppBar extends StatelessWidget
           onPressed: () {
             // Your navigation menu can be connected here later.
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Menu will be added here.'),
-              ),
+              const SnackBar(content: Text('Menu will be added here.')),
             );
           },
         ),

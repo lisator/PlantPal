@@ -4,11 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 
 class HealthHistory extends StatelessWidget {
-  const HealthHistory({
-    super.key,
-    required this.userId,
-    required this.plantId,
-  });
+  const HealthHistory({super.key, required this.userId, required this.plantId});
 
   final String userId;
   final String plantId;
@@ -28,9 +24,8 @@ class HealthHistory extends StatelessWidget {
         Text(
           'Saved plant analyses appear here so you can track '
           'changes in your plant\'s health over time.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.black54,
-              ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: Colors.black54),
         ),
 
         const SizedBox(height: 16),
@@ -68,10 +63,7 @@ class HealthHistory extends StatelessWidget {
             return Column(
               children: [
                 for (var i = 0; i < analyses.length; i++) ...[
-                  _AnalysisCard(
-                    data: analyses[i].data(),
-                    isLatest: i == 0,
-                  ),
+                  _AnalysisCard(data: analyses[i].data(), isLatest: i == 0),
                   const SizedBox(height: 12),
                 ],
               ],
@@ -84,10 +76,7 @@ class HealthHistory extends StatelessWidget {
 }
 
 class _AnalysisCard extends StatelessWidget {
-  const _AnalysisCard({
-    required this.data,
-    required this.isLatest,
-  });
+  const _AnalysisCard({required this.data, required this.isLatest});
 
   final Map<String, dynamic> data;
   final bool isLatest;
@@ -96,34 +85,26 @@ class _AnalysisCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = data['healthStatus']?.toString() ?? 'Unknown';
 
-    final confidence =
-        (data['confidence'] as num?)?.toDouble();
+    final confidence = (data['confidence'] as num?)?.toDouble();
 
-    final timestamp =
-        data['analyzedAt'] as Timestamp?;
+    final timestamp = data['analyzedAt'] as Timestamp?;
 
     final issues =
         (data['issues'] as List?)
-                ?.whereType<Map>()
-                .map(
-                  (item) => Map<String, dynamic>.from(item),
-                )
-                .toList() ??
-            [];
+            ?.whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList() ??
+        [];
 
     final care =
         (data['recommendedCare'] as List?)
-                ?.map(
-                  (item) => item.toString(),
-                )
-                .toList() ??
-            [];
+            ?.map((item) => item.toString())
+            .toList() ??
+        [];
 
-    final imageUrl =
-        data['imageUrl'] as String?;
+    final imageUrl = data['imageUrl'] as String?;
 
-    final healthy =
-        status == 'Healthy';
+    final healthy = status == 'Healthy';
 
     final dateText = timestamp == null
         ? 'Unknown date'
@@ -140,9 +121,7 @@ class _AnalysisCard extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => _FullScreenImage(
-                    imageUrl: imageUrl,
-                  ),
+                  builder: (context) => _FullScreenImage(imageUrl: imageUrl),
                 ),
               );
             },
@@ -155,21 +134,12 @@ class _AnalysisCard extends StatelessWidget {
                     width: double.infinity,
                     height: 155,
                     fit: BoxFit.cover,
-                    errorBuilder: (
-                      context,
-                      error,
-                      stackTrace,
-                    ) {
+                    errorBuilder: (context, error, stackTrace) {
                       return Container(
                         height: 155,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primaryContainer,
+                        color: Theme.of(context).colorScheme.primaryContainer,
                         alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.local_florist,
-                          size: 50,
-                        ),
+                        child: const Icon(Icons.local_florist, size: 50),
                       );
                     },
                   ),
@@ -202,9 +172,7 @@ class _AnalysisCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: healthy
-                ? const Color(0xFFE4F3DF)
-                : const Color(0xFFFFEDBC),
+            color: healthy ? const Color(0xFFE4F3DF) : const Color(0xFFFFEDBC),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -254,16 +222,10 @@ class _AnalysisCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.eco_outlined,
-                    size: 18,
-                  ),
+                  const Icon(Icons.eco_outlined, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      issue['name']?.toString() ??
-                          'Unknown issue',
-                    ),
+                    child: Text(issue['name']?.toString() ?? 'Unknown issue'),
                   ),
                   if (issue['probability'] is num)
                     Text(
@@ -296,9 +258,7 @@ class _AnalysisCard extends StatelessWidget {
                     color: Color(0xFF4F7C56),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(item),
-                  ),
+                  Expanded(child: Text(item)),
                 ],
               ),
             ),
@@ -306,38 +266,24 @@ class _AnalysisCard extends StatelessWidget {
       ],
     );
 
-   
     return Card(
       margin: EdgeInsets.zero,
       child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 4,
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          16,
-        ),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
 
         title: Row(
           children: [
             Expanded(
               child: Text(
                 dateText,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
 
             if (isLatest)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE4F3DF),
                   borderRadius: BorderRadius.circular(20),
@@ -357,69 +303,54 @@ class _AnalysisCard extends StatelessWidget {
         subtitle: Text(status),
 
         leading: Icon(
-          healthy
-              ? Icons.check_circle_outline
-              : Icons.warning_amber_rounded,
-          color: healthy
-              ? const Color(0xFF3B7D44)
-              : Colors.orange.shade800,
+          healthy ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+          color: healthy ? const Color(0xFF3B7D44) : Colors.orange.shade800,
         ),
 
-        children: [
-          details,
-        ],
+        children: [details],
       ),
     );
   }
 }
 
-  class _FullScreenImage extends StatelessWidget {
-      const _FullScreenImage({
-        required this.imageUrl,
-      });
+class _FullScreenImage extends StatelessWidget {
+  const _FullScreenImage({required this.imageUrl});
 
-      final String imageUrl;
+  final String imageUrl;
 
-      @override
-      Widget build(BuildContext context) {
-        return Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            title: const Text('Health Analysis Photo'),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Health Analysis Photo'),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return const Center(
+                child: Text(
+                  'Unable to load image.',
+                  style: TextStyle(color: Colors.white),
+                ),
+              );
+            },
           ),
-          body: Center(
-            child: InteractiveViewer(
-              minScale: 1,
-              maxScale: 4,
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.contain,
-                errorBuilder: (
-                  context,
-                  error,
-                  stackTrace,
-                ) {
-                  return const Center(
-                    child: Text(
-                      'Unable to load image.',
-                      style: TextStyle(
-                        color: Colors.white,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      }
-    }
+        ),
+      ),
+    );
+  }
+}
+
 class _MessageCard extends StatelessWidget {
-  const _MessageCard({
-    required this.message,
-  });
+  const _MessageCard({required this.message});
 
   final String message;
 
@@ -428,10 +359,7 @@ class _MessageCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-        ),
+        child: Text(message, textAlign: TextAlign.center),
       ),
     );
   }
