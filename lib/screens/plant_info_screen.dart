@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/perenual_models.dart';
 import '../services/perenual_service.dart';
@@ -59,6 +60,10 @@ class _PlantSearchState extends State<PlantSearch> {
     'Aloe',
   ];
 
+  // Recent searches are saved on this device, newest first.
+  static const String _recentSearchesKey = 'recentSearches';
+  static const int _maxRecentSearches = 6;
+
   final PerenualService _api = PerenualService.instance;
   final TextEditingController _controller = TextEditingController();
 
@@ -74,6 +79,14 @@ class _PlantSearchState extends State<PlantSearch> {
 
   // Ignores responses from searches that were replaced by a newer one.
   int _requestId = 0;
+
+  List<String> _recentSearches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentSearches();
+  }
 
   @override
   void dispose() {
@@ -100,11 +113,54 @@ class _PlantSearchState extends State<PlantSearch> {
     if (query.isNotEmpty) _search(query);
   }
 
+  Future<void> _loadRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList(_recentSearchesKey) ?? [];
+      if (!mounted) return;
+      setState(() => _recentSearches = saved);
+    } catch (e) {
+      debugPrint('Recent searches error: $e');
+    }
+  }
+
+  Future<void> _saveRecentSearches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_recentSearchesKey, _recentSearches);
+    } catch (e) {
+      debugPrint('Recent searches error: $e');
+    }
+  }
+
+  // Moves [query] to the front, dropping any older copy (ignoring case).
+  void _addRecentSearch(String query) {
+    setState(() {
+      _recentSearches = [
+        query,
+        ..._recentSearches
+            .where((s) => s.toLowerCase() != query.toLowerCase()),
+      ].take(_maxRecentSearches).toList();
+    });
+    _saveRecentSearches();
+  }
+
+  void _removeRecentSearch(String query) {
+    setState(() => _recentSearches.remove(query));
+    _saveRecentSearches();
+  }
+
+  void _clearRecentSearches() {
+    setState(() => _recentSearches = []);
+    _saveRecentSearches();
+  }
+
   /// Runs a new search, replacing the current results.
   Future<void> _search(String query) async {
     // Skip if this exact search is already showing.
     if (query == _activeQuery && _error == null && !_isLoading) return;
 
+    _addRecentSearch(query);
     final requestId = ++_requestId;
     setState(() {
       _activeQuery = query;
@@ -280,7 +336,7 @@ class _PlantSearchState extends State<PlantSearch> {
     }
 
     if (_activeQuery.isEmpty) {
-      return _SearchMessage(
+      final message = _SearchMessage(
         icon: Icons.local_florist_outlined,
         title: 'Find a plant',
         message: 'Search thousands of species to see watering, sunlight, '
@@ -301,6 +357,54 @@ class _PlantSearchState extends State<PlantSearch> {
               ),
           ],
         ),
+      );
+      if (_recentSearches.isEmpty) return message;
+
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Recently searched',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(
+                        color: _ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+              TextButton(
+                onPressed: _clearRecentSearches,
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final recent in _recentSearches)
+                InputChip(
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: _mint),
+                  shape: const StadiumBorder(),
+                  labelStyle: const TextStyle(color: _forest),
+                  avatar: const Icon(Icons.history, size: 18, color: _forest),
+                  label: Text(recent),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  deleteIconColor: _forest,
+                  deleteButtonTooltipMessage: 'Remove from recent',
+                  onPressed: () => _useSuggestion(recent),
+                  onDeleted: () => _removeRecentSearch(recent),
+                ),
+            ],
+          ),
+          message,
+        ],
       );
     }
 

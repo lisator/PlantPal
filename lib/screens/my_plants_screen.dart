@@ -204,6 +204,8 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                               plantSummary(plants),
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
+                            const SizedBox(height: 8),
+                            const WateringColorGuide(),
                           ],
                         );
                       }
@@ -387,8 +389,8 @@ class MyPlantCard extends StatelessWidget {
 }
 
 /// Pill showing when a plant needs water. Always dark text on a light pill
-/// (white text this small looks blurry on web): forest border when due
-/// today or overdue, mint when coming up, pale when there's no schedule.
+/// (white text this small looks blurry on web), tinted with the watering
+/// color (blue, yellow, red); pale when there's no schedule.
 class _WateringBadge extends StatelessWidget {
   const _WateringBadge({
     required this.text,
@@ -402,8 +404,10 @@ class _WateringBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final days = daysUntilWatering;
     final due = days != null && days <= 0;
-    final background = days == null ? _pale : _mint;
-    final foreground = due ? _forest : _ink;
+    final color = wateringColor(days);
+    final background =
+        color == null ? _pale : color.withValues(alpha: 0.12);
+    final foreground = _ink;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -411,14 +415,14 @@ class _WateringBadge extends StatelessWidget {
         color: background,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: due ? _forest : _mint,
+          color: color ?? _mint,
           width: due ? 1.5 : 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.water_drop, size: 14, color: foreground),
+          Icon(Icons.water_drop, size: 14, color: color ?? foreground),
           const SizedBox(width: 4),
           Text(
             text,
