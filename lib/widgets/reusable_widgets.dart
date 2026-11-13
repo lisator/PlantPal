@@ -93,11 +93,15 @@ class ReminderCard extends StatelessWidget {
     required this.message,
     this.isChecked = false,
     this.onChanged,
+    this.icon = Icons.local_florist,
+    this.iconColor,
   });
 
   final String message;
   final bool isChecked;
   final ValueChanged<bool?>? onChanged;
+  final IconData icon;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -107,8 +111,9 @@ class ReminderCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            const Icon(
-              Icons.local_florist,
+            Icon(
+              icon,
+              color: iconColor,
             ),
 
             const SizedBox(

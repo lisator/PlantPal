@@ -582,46 +582,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
 
         return Column(
-          children: duePlants.map((plant) {
-            return Card(
-              color: _mint,
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.water_drop_outlined,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...duePlants.map((plant) {
+              return Card(
+                color: _mint,
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.water_drop,
+                      color: wateringColor(plant.daysUntilWatering()),
+                    ),
+                  ),
+                  title: Text(
+                    plant.displayName,
+                    style: const TextStyle(
+                      color: _forest,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    wateringStatus(plant),
+                    style: const TextStyle(color: _ink),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
                     color: _forest,
                   ),
+                  onTap: () {
+                    HomeTabs.goTo(
+                      context,
+                      HomeTabs.myPlants,
+                    );
+                  },
                 ),
-                title: Text(
-                  plant.displayName,
-                  style: const TextStyle(
-                    color: _forest,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Text(
-                  wateringStatus(plant),
-                  style: const TextStyle(color: _ink),
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: _forest,
-                ),
-                onTap: () {
-                  HomeTabs.goTo(
-                    context,
-                    HomeTabs.myPlants,
-                  );
-                },
-              ),
-            );
-          }).toList(),
+              );
+            }),
+            const SizedBox(height: 2),
+            const WateringColorGuide(),
+          ],
         );
       },
     );
