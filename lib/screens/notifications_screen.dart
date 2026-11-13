@@ -11,6 +11,7 @@ import '../services/plant_reminder_service.dart';
 import 'home_screen.dart';
 import 'my_plants_screen.dart';
 import 'user_profile_screen.dart';
+import '../widgets/watering.dart';
 
 // Extra information displayed inside activity notifications.
 class _ActivityDetails {
@@ -461,9 +462,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 backgroundColor: _softColor,
                 child: Icon(
                   reminder.type == 'watering'
-                      ? Icons.water_drop_outlined
+                      ? Icons.water_drop
                       : Icons.camera_alt_outlined,
-                  color: _primaryColor,
+                  color: reminder.type == 'watering'
+                      ? wateringColor(reminder.plant.daysUntilWatering()) ??
+                            _primaryColor
+                      : _primaryColor,
                 ),
               ),
         title: Text(
@@ -764,6 +768,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           if (watering.isEmpty) const Text('No watering reminders are due.'),
 
           ...watering.map((reminder) => _reminderCard(userId, reminder)),
+
+          if (watering.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            const WateringColorGuide(),
+          ],
         ],
 
         // PLANT PROGRESS REMINDERS

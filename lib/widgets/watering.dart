@@ -53,7 +53,6 @@ class WateringColorGuide extends StatelessWidget {
       spacing: 16,
       runSpacing: 4,
       children: [
-        item(wateringBlue, 'On track'),
         item(wateringYellow, 'Due today or tomorrow'),
         item(wateringRed, 'Overdue'),
       ],
@@ -278,8 +277,9 @@ class WateringRemindersCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: ReminderCard(
-            message:
-                '${wateringStatus(plant)}: ${plant.displayName}'
+            icon: Icons.water_drop,
+            iconColor: wateringColor(plant.daysUntilWatering()),
+            message: '${wateringStatus(plant)}: ${plant.displayName}'
                 '${plant.nickname != null ? ' (${plant.commonName})' : ''}',
             onChanged: (checked) {
               if (checked == true) {
@@ -291,10 +291,22 @@ class WateringRemindersCard extends StatelessWidget {
       if (upcoming.isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            'Next: ${upcoming.first.displayName} - '
-            '${wateringStatus(upcoming.first).replaceFirst('Water ', '')}',
-            style: textTheme.bodyMedium,
+          child: Row(
+            children: [
+              Icon(
+                Icons.water_drop,
+                size: 16,
+                color: wateringColor(upcoming.first.daysUntilWatering()),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Next: ${upcoming.first.displayName} - '
+                  '${wateringStatus(upcoming.first).replaceFirst('Water ', '')}',
+                  style: textTheme.bodyMedium,
+                ),
+              ),
+            ],
           ),
         ),
       for (final plant in unscheduled)
@@ -313,6 +325,10 @@ class WateringRemindersCard extends StatelessWidget {
             ),
           ],
         ),
+      if (scheduled.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        const WateringColorGuide(),
+      ],
     ];
 
     return Column(
