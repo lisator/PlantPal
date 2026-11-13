@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/plant_api_service.dart';
 
@@ -10,6 +11,7 @@ import '../services/cloudinary_service.dart';
 import '../services/database_service.dart';
 import 'home_screen.dart';
 import 'plant_camera_screen.dart';
+import 'my_plants_screen.dart';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -24,6 +26,14 @@ class _UploadScreenState extends State<UploadScreen> {
 
   static const int _maxImages = 5;
 
+  late Future<List<_RecentAnalysisItem>> _recentAnalyses;
+
+  @override
+  void initState() {
+    super.initState();
+    _recentAnalyses = _loadRecentAnalyses();
+  }
+
   //String? _fileName;
   bool _isAnalyzing = false;
 
@@ -37,6 +47,57 @@ class _UploadScreenState extends State<UploadScreen> {
 
   List<Map<String, dynamic>> _healthIssues = [];
   List<String> _recommendedCare = [];
+
+  Future<List<_RecentAnalysisItem>> _loadRecentAnalyses() async {
+      final userId = currentUserId();
+
+      if (userId == null) {
+        return [];
+      }
+
+      final plants =
+          await DatabaseService().getMyPlants(userId).first;
+
+      final recentAnalyses = <_RecentAnalysisItem>[];
+
+      for (final plant in plants) {
+        final snapshot =
+            await DatabaseService().getPlantAnalyses(
+          userId: userId,
+          plantId: plant.id,
+        ).first;
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+
+          final timestamp =
+              data['analyzedAt'] as Timestamp?;
+
+          recentAnalyses.add(
+            _RecentAnalysisItem(
+              plant: plant,
+              plantName: plant.displayName,
+              imageUrl: data['imageUrl'] as String?,
+              healthStatus:
+                  data['healthStatus']?.toString() ?? 'Unknown',
+              analyzedAt: timestamp?.toDate(),
+            ),
+          );
+        }
+      }
+
+      recentAnalyses.sort((a, b) {
+        final aDate =
+            a.analyzedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        final bDate =
+            b.analyzedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        return bDate.compareTo(aDate);
+      });
+
+      return recentAnalyses.take(3).toList();
+    }
 
   Future<void> _pickImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
@@ -392,9 +453,9 @@ class _UploadScreenState extends State<UploadScreen> {
         SnackBar(content: Text('${plant.displayName} was added to My Plants.')),
       );
 
-      _resetAnalysis();
-    } catch (e) {
-      debugPrint('Save plant error: $e');
+    _resetAnalysis();
+  } catch (e) {
+    debugPrint('Save plant error: $e');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -520,24 +581,29 @@ class _UploadScreenState extends State<UploadScreen> {
         ),
       );
 
-      _resetAnalysis();
-    } catch (e) {
-      debugPrint('Save existing plant analysis error: $e');
+    _resetAnalysis();
+  } catch (e) {
+    debugPrint(
+      'Save existing plant analysis error: $e',
+    );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save analysis. Try again.')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not save analysis. Try again.',
+          ),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
     }
   }
-
+}
   @override
   Widget build(BuildContext context) {
     final bool hasResults = _scientificName != null;
@@ -600,6 +666,12 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ],
           ),
+
+          if (_imageBytesList.isEmpty) ...[
+              const SizedBox(height: 28),
+
+              _buildRecentAnalyses(),
+            ],
 
           // ------------------------------------------------------------
           // SELECTED IMAGE
