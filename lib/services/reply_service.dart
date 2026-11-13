@@ -8,13 +8,12 @@ class ReplyService {
   CollectionReference<Map<String, dynamic>> _replies(
     String postId,
     String commentId,
-  ) =>
-      _db
-          .collection('posts')
-          .doc(postId)
-          .collection('comments')
-          .doc(commentId)
-          .collection('replies');
+  ) => _db
+      .collection('posts')
+      .doc(postId)
+      .collection('comments')
+      .doc(commentId)
+      .collection('replies');
 
   User _currentUser() {
     final user = FirebaseAuth.instance.currentUser;
@@ -40,10 +39,7 @@ class ReplyService {
   Stream<QuerySnapshot<Map<String, dynamic>>> getReplies({
     required String postId,
     required String commentId,
-  }) =>
-      _replies(postId, commentId)
-          .orderBy('createdAt')
-          .snapshots();
+  }) => _replies(postId, commentId).orderBy('createdAt').snapshots();
 
   // Add a new reply.
   Future<void> addReply({

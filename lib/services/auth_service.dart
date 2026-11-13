@@ -12,17 +12,15 @@ class AuthService {
     String password,
   ) async {
     try {
-      final UserCredential credential =
-          await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final UserCredential credential = await _auth
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          );
 
       return credential.user;
     } on FirebaseAuthException catch (e) {
-      throw Exception(
-        e.message ?? 'Unable to create account.',
-      );
+      throw Exception(e.message ?? 'Unable to create account.');
     }
   }
 
@@ -31,27 +29,20 @@ class AuthService {
     String password,
   ) async {
     try {
-      final UserCredential credential =
-          await _auth.signInWithEmailAndPassword(
+      final UserCredential credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
       return credential.user;
     } on FirebaseAuthException catch (e) {
-      throw Exception(
-        e.message ?? 'Unable to sign in.',
-      );
+      throw Exception(e.message ?? 'Unable to sign in.');
     }
   }
 
-  Future<void> sendPasswordResetEmail(
-    String email,
-  ) async {
+  Future<void> sendPasswordResetEmail(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(
-        email: email.trim(),
-      );
+      await _auth.sendPasswordResetEmail(email: email.trim());
     } on FirebaseAuthException catch (e) {
       throw Exception(
         '${e.code}: ${e.message ?? 'Unable to send password reset email.'}',
@@ -63,7 +54,8 @@ class AuthService {
     required String phoneNumber,
     required Function(String verificationId) onCodeSent,
     required Function(FirebaseAuthException e) onVerificationFailed,
-    required Function(PhoneAuthCredential credential) onAutoVerificationComplete,
+    required Function(PhoneAuthCredential credential)
+    onAutoVerificationComplete,
   }) async {
     await _auth.verifyPhoneNumber(
       phoneNumber: phoneNumber,
@@ -96,13 +88,14 @@ class AuthService {
       );
 
       // Sign the user in with the credential
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
       throw Exception(e.message ?? 'Failed to verify SMS code.');
     }
   }
-
 
   Future<void> signOut() async {
     await _auth.signOut();

@@ -1,9 +1,9 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
 import '../widgets/post_photo_gallery.dart';
 
 import 'follow_list_screen.dart';
@@ -12,27 +12,32 @@ import 'user_posts_screen.dart';
 class UserProfileScreen extends StatelessWidget {
   final String userId;
 
-  const UserProfileScreen({
-    super.key,
-    required this.userId,
-  });
+  const UserProfileScreen({super.key, required this.userId});
 
-  // PlantPal colors.
-  static const Color _forest = Color(0xFF315F43);
-  static const Color _sage = Color(0xFF83AD8A);
-  static const Color _pale = Color(0xFFF6F8F2);
-  static const Color _mint = Color(0xFFE0EBDD);
-  static const Color _ink = Color(0xFF24372A);
+  static const Color _forest = PlantPalColors.forest;
+
+  Color _background(BuildContext context) => PlantPalColors.background(context);
+
+  Color _card(BuildContext context) => PlantPalColors.card(context);
+
+  Color _text(BuildContext context) => PlantPalColors.text(context);
+
+  Color _secondary(BuildContext context) =>
+      PlantPalColors.secondaryText(context);
+
+  Color _accent(BuildContext context) => PlantPalColors.accent(context);
+
+  Color _border(BuildContext context) => PlantPalColors.border(context);
+
+  Color _soft(BuildContext context) => PlantPalColors.softBackground(context);
 
   // Display an error if following or unfollowing fails.
   void _showError(BuildContext context, Object error) {
     if (!context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Unable to update follow: $error'),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Unable to update follow: $error')));
   }
 
   // Display a profile statistic.
@@ -54,28 +59,22 @@ class UserProfileScreen extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
               child: Column(
                 children: [
                   Text(
                     count,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 23,
                       fontWeight: FontWeight.bold,
-                      color: _forest,
+                      color: _accent(context),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     label,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: _ink,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: _text(context), fontSize: 13),
                   ),
                 ],
               ),
@@ -99,14 +98,13 @@ class UserProfileScreen extends StatelessWidget {
       ),
       builder: (context, followSnapshot) {
         if (followSnapshot.hasError) {
-          return const Text(
+          return Text(
             'Unable to load follow status.',
-            style: TextStyle(color: _forest),
+            style: TextStyle(color: _text(context)),
           );
         }
 
-        final bool following =
-            followSnapshot.data?.exists ?? false;
+        final bool following = followSnapshot.data?.exists ?? false;
 
         final bool loading = !followSnapshot.hasData;
 
@@ -115,11 +113,9 @@ class UserProfileScreen extends StatelessWidget {
           child: following
               ? OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: _forest,
-                    side: const BorderSide(color: _sage),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 13,
-                    ),
+                    foregroundColor: _accent(context),
+                    side: BorderSide(color: _border(context)),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -137,18 +133,14 @@ class UserProfileScreen extends StatelessWidget {
                             _showError(context, e);
                           }
                         },
-                  icon: const Icon(
-                    Icons.person_remove_outlined,
-                  ),
+                  icon: const Icon(Icons.person_remove_outlined),
                   label: const Text('Following'),
                 )
               : FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: _forest,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 13,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -166,9 +158,7 @@ class UserProfileScreen extends StatelessWidget {
                             _showError(context, e);
                           }
                         },
-                  icon: const Icon(
-                    Icons.person_add_alt_1,
-                  ),
+                  icon: const Icon(Icons.person_add_alt_1),
                   label: const Text('Follow'),
                 ),
         );
@@ -176,27 +166,26 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  // Display one Community post on the user's profile.
+  // Display a Community post on the user's profile.
   Widget _postCard(
+    BuildContext context,
     String postId,
     Map<String, dynamic> data,
   ) {
-    final title =
-        (data['title'] ?? '').toString();
+    final title = (data['title'] ?? '').toString();
 
-    final description =
-        (data['description'] ?? '').toString();
+    final description = (data['description'] ?? '').toString();
 
-    // Supports old single-picture posts and new galleries.
+    // Supports old single-photo posts and new galleries.
     final List<String> images = postImageUrls(data);
 
     return Card(
-      color: Colors.white,
+      color: _card(context),
       elevation: 1,
       shadowColor: _forest.withValues(alpha: 0.12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: _mint),
+        side: BorderSide(color: _border(context)),
       ),
       margin: const EdgeInsets.only(bottom: 14),
       child: Padding(
@@ -204,34 +193,26 @@ class UserProfileScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Post title.
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 19,
                 fontWeight: FontWeight.bold,
-                color: _forest,
+                color: _text(context),
               ),
             ),
 
             const SizedBox(height: 8),
 
-            // Post description.
             Text(
               description,
-              style: const TextStyle(
-                fontSize: 14,
-                color: _ink,
-              ),
+              style: TextStyle(fontSize: 14, color: _text(context)),
             ),
 
             // Swipe through all attached pictures.
             // Tap to open the full-screen viewer.
             if (images.isNotEmpty)
-              PostPhotoGallery(
-                key: ValueKey(postId),
-                imageUrls: images,
-              ),
+              PostPhotoGallery(key: ValueKey(postId), imageUrls: images),
           ],
         ),
       ),
@@ -256,9 +237,7 @@ class UserProfileScreen extends StatelessWidget {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(
-                color: _forest,
-              ),
+              child: CircularProgressIndicator(),
             ),
           );
         }
@@ -267,11 +246,9 @@ class UserProfileScreen extends StatelessWidget {
 
         // Display newest posts first.
         posts.sort((a, b) {
-          final aTime =
-              a.data()['createdAt'] as Timestamp?;
+          final aTime = a.data()['createdAt'] as Timestamp?;
 
-          final bTime =
-              b.data()['createdAt'] as Timestamp?;
+          final bTime = b.data()['createdAt'] as Timestamp?;
 
           if (aTime == null && bTime == null) {
             return 0;
@@ -288,29 +265,27 @@ class UserProfileScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: _card(context),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _mint),
+              border: Border.all(color: _border(context)),
             ),
-            child: const Column(
+            child: Column(
               children: [
-                Icon(
-                  Icons.spa_outlined,
-                  color: _sage,
-                  size: 42,
-                ),
-                SizedBox(height: 10),
+                Icon(Icons.spa_outlined, color: _accent(context), size: 42),
+                const SizedBox(height: 10),
                 Text(
                   'No posts yet.',
                   style: TextStyle(
-                    color: _forest,
+                    color: _text(context),
                     fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 Text(
                   'This user has not shared any Community posts.',
                   textAlign: TextAlign.center,
+                  style: TextStyle(color: _secondary(context)),
                 ),
               ],
             ),
@@ -319,10 +294,7 @@ class UserProfileScreen extends StatelessWidget {
 
         return Column(
           children: posts.map((post) {
-            return _postCard(
-              post.id,
-              post.data(),
-            );
+            return _postCard(context, post.id, post.data());
           }).toList(),
         );
       },
@@ -331,91 +303,73 @@ class UserProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final DatabaseService databaseService =
-        DatabaseService();
+    final DatabaseService databaseService = DatabaseService();
 
-    final User? currentUser =
-        FirebaseAuth.instance.currentUser;
+    final User? currentUser = FirebaseAuth.instance.currentUser;
 
-    // Local theme keeps other PlantPal screens unchanged.
+    final baseTheme = Theme.of(context);
+
+    // Keep the selected brightness instead of forcing
+    // a light color scheme.
     return Theme(
-      data: Theme.of(context).copyWith(
+      data: baseTheme.copyWith(
         colorScheme: ColorScheme.fromSeed(
           seedColor: _forest,
+          brightness: baseTheme.brightness,
         ),
         textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: _forest,
-          ),
+          style: TextButton.styleFrom(foregroundColor: _accent(context)),
         ),
       ),
       child: Scaffold(
-        backgroundColor: _pale,
+        backgroundColor: _background(context),
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Profile',
             style: TextStyle(
-              color: _forest,
+              color: _text(context),
               fontWeight: FontWeight.bold,
             ),
           ),
           centerTitle: true,
-          backgroundColor: _pale,
-          surfaceTintColor: _pale,
+          backgroundColor: _background(context),
+          foregroundColor: _text(context),
+          surfaceTintColor: Colors.transparent,
         ),
-        body: StreamBuilder<
-            DocumentSnapshot<Map<String, dynamic>>>(
+        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: databaseService.getUserStream(userId),
           builder: (context, snapshot) {
-            if (snapshot.connectionState ==
-                    ConnectionState.waiting &&
+            if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {
-              return const Center(
-                child: CircularProgressIndicator(
-                  color: _forest,
-                ),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             if (snapshot.hasError) {
-              return const Center(
-                child: Text('Unable to load profile.'),
-              );
+              return const Center(child: Text('Unable to load profile.'));
             }
 
-            if (!snapshot.hasData ||
-                !snapshot.data!.exists) {
-              return const Center(
-                child: Text('User not found.'),
-              );
+            if (!snapshot.hasData || !snapshot.data!.exists) {
+              return const Center(child: Text('User not found.'));
             }
 
             final data = snapshot.data!.data()!;
 
-            final displayName =
-                (data['displayName'] ?? 'PlantPal User')
-                    .toString();
+            final displayName = (data['displayName'] ?? 'PlantPal User')
+                .toString();
 
-            final username =
-                (data['username'] ?? '').toString();
+            final username = (data['username'] ?? '').toString();
 
-            final bio =
-                (data['bio'] ?? '').toString();
+            final bio = (data['bio'] ?? '').toString();
 
-            // Cloudinary stores the picture.
-            // Firestore stores the photo URL.
-            final photoUrl =
-                (data['photoUrl'] ?? '').toString();
+            // Cloudinary stores the picture;
+            // Firestore stores its URL.
+            final photoUrl = (data['photoUrl'] ?? '').toString();
 
             return Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 700,
-                ),
+                constraints: const BoxConstraints(maxWidth: 700),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(
-                    16, 18, 16, 30,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
                   child: Column(
                     children: [
                       // PROFILE HEADER
@@ -423,28 +377,25 @@ class UserProfileScreen extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(22),
                         decoration: BoxDecoration(
-                          color: _mint,
-                          borderRadius:
-                              BorderRadius.circular(24),
+                          color: _soft(context),
+                          borderRadius: BorderRadius.circular(24),
                         ),
                         child: Column(
                           children: [
-                            const Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.center,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   Icons.spa_outlined,
-                                  color: _forest,
+                                  color: _accent(context),
                                 ),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Text(
                                   'PlantPal Member',
                                   style: TextStyle(
-                                    color: _forest,
+                                    color: _text(context),
                                     fontSize: 18,
-                                    fontWeight:
-                                        FontWeight.bold,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
@@ -452,19 +403,18 @@ class UserProfileScreen extends StatelessWidget {
 
                             const SizedBox(height: 20),
 
-                            // Show the user's real profile picture.
+                            // Show the user's profile picture.
                             CircleAvatar(
                               radius: 58,
-                              backgroundColor: Colors.white,
-                              backgroundImage:
-                                  photoUrl.isNotEmpty
-                                      ? NetworkImage(photoUrl)
-                                      : null,
+                              backgroundColor: _card(context),
+                              backgroundImage: photoUrl.isNotEmpty
+                                  ? NetworkImage(photoUrl)
+                                  : null,
                               child: photoUrl.isEmpty
-                                  ? const Icon(
+                                  ? Icon(
                                       Icons.person,
                                       size: 60,
-                                      color: _forest,
+                                      color: _accent(context),
                                     )
                                   : null,
                             ),
@@ -474,8 +424,8 @@ class UserProfileScreen extends StatelessWidget {
                             Text(
                               displayName,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _ink,
+                              style: TextStyle(
+                                color: _text(context),
                                 fontSize: 25,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -485,8 +435,8 @@ class UserProfileScreen extends StatelessWidget {
                               const SizedBox(height: 5),
                               Text(
                                 username,
-                                style: const TextStyle(
-                                  color: _forest,
+                                style: TextStyle(
+                                  color: _accent(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -495,12 +445,10 @@ class UserProfileScreen extends StatelessWidget {
                             const SizedBox(height: 12),
 
                             Text(
-                              bio.isEmpty
-                                  ? 'No bio yet.'
-                                  : bio,
+                              bio.isEmpty ? 'No bio yet.' : bio,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _ink,
+                              style: TextStyle(
+                                color: _text(context),
                                 fontSize: 14,
                               ),
                             ),
@@ -513,23 +461,20 @@ class UserProfileScreen extends StatelessWidget {
                       // POSTS, FOLLOWERS, FOLLOWING
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: _mint),
-                          borderRadius:
-                              BorderRadius.circular(20),
+                          color: _card(context),
+                          border: Border.all(color: _border(context)),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
                           children: [
                             _stat(
-                              stream: databaseService
-                                  .getPostsByUser(userId),
+                              stream: databaseService.getPostsByUser(userId),
                               label: 'Posts',
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        UserPostsScreen(
+                                    builder: (context) => UserPostsScreen(
                                       userId: userId,
                                       title: 'Posts',
                                     ),
@@ -541,19 +486,17 @@ class UserProfileScreen extends StatelessWidget {
                             Container(
                               width: 1,
                               height: 42,
-                              color: _mint,
+                              color: _border(context),
                             ),
 
                             _stat(
-                              stream: databaseService
-                                  .getFollowers(userId),
+                              stream: databaseService.getFollowers(userId),
                               label: 'Followers',
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        FollowListScreen(
+                                    builder: (context) => FollowListScreen(
                                       userId: userId,
                                       showFollowers: true,
                                     ),
@@ -565,19 +508,17 @@ class UserProfileScreen extends StatelessWidget {
                             Container(
                               width: 1,
                               height: 42,
-                              color: _mint,
+                              color: _border(context),
                             ),
 
                             _stat(
-                              stream: databaseService
-                                  .getFollowing(userId),
+                              stream: databaseService.getFollowing(userId),
                               label: 'Following',
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        FollowListScreen(
+                                    builder: (context) => FollowListScreen(
                                       userId: userId,
                                       showFollowers: false,
                                     ),
@@ -592,8 +533,7 @@ class UserProfileScreen extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       // FOLLOW OR UNFOLLOW
-                      if (currentUser != null &&
-                          currentUser.uid != userId)
+                      if (currentUser != null && currentUser.uid != userId)
                         _followButton(
                           context: context,
                           databaseService: databaseService,
@@ -603,18 +543,15 @@ class UserProfileScreen extends StatelessWidget {
                       const SizedBox(height: 26),
 
                       // USER COMMUNITY POSTS
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
-                            Icons.spa_outlined,
-                            color: _forest,
-                          ),
-                          SizedBox(width: 8),
+                          Icon(Icons.spa_outlined, color: _accent(context)),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               'Community Posts',
                               style: TextStyle(
-                                color: _forest,
+                                color: _text(context),
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),

@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,11 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/cloudinary_service.dart';
+import '../theme/plantpal_colors.dart';
 import '../widgets/reusable_widgets.dart';
 
 import 'follow_list_screen.dart';
 import 'login_screen.dart';
 import 'saved_posts_screen.dart';
+import 'settings_screen.dart';
 import 'user_posts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -30,13 +31,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _uploadingProfilePicture = false;
 
-  // PlantPal profile colors.
-  // These colors affect this screen, not the whole application.
-  static const Color _forest = Color(0xFF315F43);
-  static const Color _sage = Color(0xFF83AD8A);
-  static const Color _pale = Color(0xFFF6F8F2);
-  static const Color _mint = Color(0xFFE0EBDD);
-  static const Color _ink = Color(0xFF24372A);
+  static const Color _forest = PlantPalColors.forest;
+
+  Color get _background => PlantPalColors.background(context);
+  Color get _card => PlantPalColors.card(context);
+  Color get _text => PlantPalColors.text(context);
+  Color get _secondary => PlantPalColors.secondaryText(context);
+  Color get _accent => PlantPalColors.accent(context);
+  Color get _border => PlantPalColors.border(context);
+  Color get _soft => PlantPalColors.softBackground(context);
 
   void _showMessage(String message) {
     if (!mounted) return;
@@ -45,7 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  // Upload a selected picture to Cloudinary.
+  // Choose a profile picture and upload to Cloudinary.
   Future<void> _changeProfilePicture(String uid) async {
     if (_uploadingProfilePicture) return;
 
@@ -59,41 +62,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (image == null || !mounted) return;
 
-      setState(() {
-        _uploadingProfilePicture = true;
-      });
+      setState(() => _uploadingProfilePicture = true);
 
-      // Cloudinary stores the image and returns its URL.
       final imageUrl = await _cloudinaryService.uploadImage(image);
 
-      // Firestore stores only the image URL.
-      await _databaseService.updateProfilePicture(
-        uid: uid,
-        photoUrl: imageUrl,
-      );
+      await _databaseService.updateProfilePicture(uid: uid, photoUrl: imageUrl);
 
       _showMessage('Profile picture updated successfully!');
     } catch (e) {
       _showMessage('Could not upload profile picture: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _uploadingProfilePicture = false;
-        });
+        setState(() => _uploadingProfilePicture = false);
       }
     }
   }
 
-  // Remove the picture from the profile.
-  // This does not delete the uploaded file from Cloudinary.
+  // Remove the profile picture URL from Firestore.
   Future<void> _removeProfilePicture(String uid) async {
     if (_uploadingProfilePicture) return;
 
     try {
-      await _databaseService.updateProfilePicture(
-        uid: uid,
-        photoUrl: '',
-      );
+      await _databaseService.updateProfilePicture(uid: uid, photoUrl: '');
 
       _showMessage('Profile picture removed.');
     } catch (e) {
@@ -101,13 +91,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Show options for changing or removing the picture.
+  // Open photo selection options.
   Future<void> _showPhotoOptions(String uid, bool hasPhoto) async {
     if (_uploadingProfilePicture) return;
 
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: _pale,
+      backgroundColor: _card,
       showDragHandle: true,
       builder: (sheetContext) {
         return SafeArea(
@@ -115,10 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
-                  Icons.photo_library_outlined,
-                  color: _forest,
-                ),
+                leading: Icon(Icons.photo_library_outlined, color: _accent),
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -127,10 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               if (hasPhoto)
                 ListTile(
-                  leading: const Icon(
-                    Icons.delete_outline,
-                    color: _forest,
-                  ),
+                  leading: Icon(Icons.delete_outline, color: _accent),
                   title: const Text('Remove Profile Picture'),
                   onTap: () {
                     Navigator.pop(sheetContext);
@@ -140,9 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ListTile(
                 leading: const Icon(Icons.close),
                 title: const Text('Cancel'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                },
+                onTap: () => Navigator.pop(sheetContext),
               ),
             ],
           ),
@@ -151,8 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Reusable dialog for editing profile information.
-  // TextFormField avoids manually disposing a temporary controller.
+  // Reusable dialog for editing profile details.
   Future<String?> _showEditDialog({
     required String title,
     required String label,
@@ -166,16 +147,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(title),
+          backgroundColor: PlantPalColors.card(dialogContext),
+          title: Text(
+            title,
+            style: TextStyle(color: PlantPalColors.text(dialogContext)),
+          ),
           content: TextFormField(
             initialValue: currentValue,
             maxLength: maxLength,
             maxLines: maxLines,
-            onChanged: (value) {
-              input = value;
-            },
+            style: TextStyle(color: PlantPalColors.text(dialogContext)),
+            onChanged: (value) => input = value,
             decoration: InputDecoration(
               labelText: label,
+              filled: true,
+              fillColor: PlantPalColors.softBackground(dialogContext),
+              labelStyle: TextStyle(
+                color: PlantPalColors.secondaryText(dialogContext),
+              ),
               border: const OutlineInputBorder(),
             ),
           ),
@@ -185,6 +174,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _forest,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () {
                 Navigator.pop(dialogContext, input.trim());
               },
@@ -196,7 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Update display name.
+  // Update the display name.
   Future<void> _editName({
     required String uid,
     required String currentName,
@@ -211,16 +204,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (result == null || result.isEmpty) return;
 
     try {
-      await _databaseService.updateProfile(
-        uid: uid,
-        displayName: result,
-      );
+      await _databaseService.updateProfile(uid: uid, displayName: result);
     } catch (e) {
       _showMessage('Unable to update name: $e');
     }
   }
 
-  // Update username.
+  // Update the username.
   Future<void> _editUsername({
     required String uid,
     required String currentUsername,
@@ -236,7 +226,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (!RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(result)) {
       _showMessage(
-        'Username must be 3-20 characters using letters, numbers, or underscores.',
+        'Username must be 3-20 characters using '
+        'letters, numbers, or underscores.',
       );
       return;
     }
@@ -252,16 +243,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      await _databaseService.updateProfile(
-        uid: uid,
-        username: result,
-      );
+      await _databaseService.updateProfile(uid: uid, username: result);
     } catch (e) {
       _showMessage('Unable to update username: $e');
     }
   }
 
-  // Update bio.
+  // Update the user's bio.
   Future<void> _editBio({
     required String uid,
     required String currentBio,
@@ -277,32 +265,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (result == null) return;
 
     try {
-      await _databaseService.updateProfile(
-        uid: uid,
-        bio: result,
-      );
+      await _databaseService.updateProfile(uid: uid, bio: result);
     } catch (e) {
       _showMessage('Unable to update bio: $e');
     }
   }
 
+  // Show the user's email.
   void _showEmail(String email) {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Email'),
-        content: SelectableText(email),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Email'),
+          content: SelectableText(email),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  // Email the user a password reset link.
+  // Send a password reset email.
   Future<void> _resetPassword(String email) async {
     if (email.isEmpty) return;
 
@@ -314,7 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // Sign out of PlantPal.
+  // Log out of PlantPal.
   Future<void> _signOut() async {
     try {
       await _authService.signOut();
@@ -323,9 +311,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
         (route) => false,
       );
     } catch (e) {
@@ -333,7 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // A small widget for profile statistics.
+  // Display the number of posts, followers, or following.
   Widget _stat({
     required Stream<QuerySnapshot<Map<String, dynamic>>> stream,
     required String label,
@@ -347,30 +333,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: onTap,
             borderRadius: BorderRadius.circular(14),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
               child: Column(
                 children: [
                   Text(
-                    snapshot.hasData
-                        ? '${snapshot.data!.docs.length}'
-                        : '—',
-                    style: const TextStyle(
+                    snapshot.hasData ? '${snapshot.data!.docs.length}' : '—',
+                    style: TextStyle(
                       fontSize: 23,
                       fontWeight: FontWeight.bold,
-                      color: _forest,
+                      color: _accent,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     label,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: _ink,
-                    ),
+                    style: TextStyle(fontSize: 13, color: _text),
                   ),
                 ],
               ),
@@ -381,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Display one reusable setting row.
+  // Reusable row used inside settings cards.
   Widget _settingTile({
     required IconData icon,
     required String title,
@@ -389,51 +367,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 3,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       leading: Container(
         height: 42,
         width: 42,
         decoration: BoxDecoration(
-          color: _mint,
+          color: _soft,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: _forest),
+        child: Icon(icon, color: _accent),
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          color: _ink,
-        ),
+        style: TextStyle(fontWeight: FontWeight.w600, color: _text),
       ),
       subtitle: Text(
         subtitle,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: _secondary),
       ),
-      trailing: const Icon(
-        Icons.chevron_right,
-        color: _forest,
-      ),
+      trailing: Icon(Icons.chevron_right, color: _accent),
       onTap: onTap,
     );
   }
 
-  // Card used to group profile settings.
-  Widget _sectionCard({
-    required String title,
-    required List<Widget> children,
-  }) {
+  // Reusable settings card.
+  Widget _sectionCard({required String title, required List<Widget> children}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _mint),
+        border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,8 +409,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Text(
               title,
-              style: const TextStyle(
-                color: _forest,
+              style: TextStyle(
+                color: _accent,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -455,96 +422,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Main profile content.
   Widget _buildProfileContent(User user) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _databaseService.getUserStream(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(color: _forest),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
-          return const Center(
-            child: Text('Unable to load profile.'),
-          );
+          return const Center(child: Text('Unable to load profile.'));
         }
 
         final data = snapshot.data?.data() ?? <String, dynamic>{};
 
-        final displayName =
-            (data['displayName'] ?? 'Plant Friend').toString();
-
-        final username =
-            (data['username'] ?? '').toString();
-
-        final bio =
-            (data['bio'] ?? '').toString();
-
-        final email =
-            (data['email'] ?? user.email ?? '').toString();
-
-        final photoUrl =
-            (data['photoUrl'] ?? '').toString();
+        final displayName = (data['displayName'] ?? 'Plant Friend').toString();
+        final username = (data['username'] ?? '').toString();
+        final bio = (data['bio'] ?? '').toString();
+        final email = (data['email'] ?? user.email ?? '').toString();
+        final photoUrl = (data['photoUrl'] ?? '').toString();
 
         return ColoredBox(
-          color: _pale,
+          color: _background,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 700),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
-                  16, 18, 16, 30,
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
                 child: Column(
                   children: [
-                    // PROFILE PICTURE
-                    // Profile header uses the PlantPal green theme.
+                    // Profile header.
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
-                        color: _mint,
+                        color: _soft,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Column(
                         children: [
-                          const Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.center,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.spa_outlined,
-                                color: _forest,
-                              ),
-                              SizedBox(width: 8),
+                              Icon(Icons.spa_outlined, color: _accent),
+                              const SizedBox(width: 8),
                               Text(
                                 'My PlantPal Profile',
                                 style: TextStyle(
-                                  color: _forest,
+                                  color: _text,
                                   fontSize: 19,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
                           ),
+
                           const SizedBox(height: 20),
 
                           Stack(
                             children: [
                               CircleAvatar(
                                 radius: 58,
-                                backgroundColor: Colors.white,
+                                backgroundColor: _card,
                                 backgroundImage: photoUrl.isNotEmpty
                                     ? NetworkImage(photoUrl)
                                     : null,
                                 child: photoUrl.isEmpty
-                                    ? const Icon(
+                                    ? Icon(
                                         Icons.person,
                                         size: 60,
-                                        color: _forest,
+                                        color: _accent,
                                       )
                                     : null,
                               ),
@@ -565,9 +514,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     onPressed: _uploadingProfilePicture
                                         ? null
                                         : () => _showPhotoOptions(
-                                              user.uid,
-                                              photoUrl.isNotEmpty,
-                                            ),
+                                            user.uid,
+                                            photoUrl.isNotEmpty,
+                                          ),
                                   ),
                                 ),
                               ),
@@ -579,24 +528,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           if (_uploadingProfilePicture)
                             const Padding(
                               padding: EdgeInsets.all(8),
-                              child: CircularProgressIndicator(
-                                color: _forest,
-                              ),
+                              child: CircularProgressIndicator(),
                             ),
 
                           TextButton.icon(
                             onPressed: _uploadingProfilePicture
                                 ? null
                                 : () => _showPhotoOptions(
-                                      user.uid,
-                                      photoUrl.isNotEmpty,
-                                    ),
-                            icon: const Icon(
-                              Icons.photo_camera_outlined,
-                            ),
-                            label: const Text(
-                              'Change Profile Picture',
-                            ),
+                                    user.uid,
+                                    photoUrl.isNotEmpty,
+                                  ),
+                            icon: const Icon(Icons.photo_camera_outlined),
+                            label: const Text('Change Profile Picture'),
                           ),
 
                           const SizedBox(height: 4),
@@ -604,10 +547,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             displayName,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 25,
                               fontWeight: FontWeight.bold,
-                              color: _ink,
+                              color: _text,
                             ),
                           ),
 
@@ -615,8 +558,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const SizedBox(height: 5),
                             Text(
                               username,
-                              style: const TextStyle(
-                                color: _forest,
+                              style: TextStyle(
+                                color: _accent,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -629,10 +572,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ? 'Add a bio to tell people about your plants 🌱'
                                 : bio,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: _ink,
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: _text, fontSize: 14),
                           ),
                         ],
                       ),
@@ -640,19 +580,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 16),
 
-                    // POSTS, FOLLOWERS, FOLLOWING
+                    // Posts, Followers, and Following.
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: _mint),
+                        color: _card,
+                        border: Border.all(color: _border),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         children: [
                           _stat(
-                            stream: _databaseService.getPostsByUser(
-                              user.uid,
-                            ),
+                            stream: _databaseService.getPostsByUser(user.uid),
                             label: 'Posts',
                             onTap: () {
                               Navigator.push(
@@ -666,15 +604,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               );
                             },
                           ),
-                          Container(
-                            width: 1,
-                            height: 42,
-                            color: _mint,
-                          ),
+                          Container(width: 1, height: 42, color: _border),
                           _stat(
-                            stream: _databaseService.getFollowers(
-                              user.uid,
-                            ),
+                            stream: _databaseService.getFollowers(user.uid),
                             label: 'Followers',
                             onTap: () {
                               Navigator.push(
@@ -688,15 +620,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               );
                             },
                           ),
-                          Container(
-                            width: 1,
-                            height: 42,
-                            color: _mint,
-                          ),
+                          Container(width: 1, height: 42, color: _border),
                           _stat(
-                            stream: _databaseService.getFollowing(
-                              user.uid,
-                            ),
+                            stream: _databaseService.getFollowing(user.uid),
                             label: 'Following',
                             onTap: () {
                               Navigator.push(
@@ -716,21 +642,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 18),
 
-                    // SAVED COMMUNITY POSTS
+                    // Saved Community Posts.
                     _sectionCard(
                       title: 'My Community',
                       children: [
                         _settingTile(
                           icon: Icons.bookmark_outline,
                           title: 'Saved Posts',
-                          subtitle:
-                              'View the Community posts you bookmarked.',
+                          subtitle: 'View the Community posts you bookmarked.',
                           onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    const SavedPostsScreen(),
+                                builder: (context) => const SavedPostsScreen(),
                               ),
                             );
                           },
@@ -740,7 +664,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Profile details can be edited here.
+                    // Edit Profile.
                     _sectionCard(
                       title: 'Edit Profile',
                       children: [
@@ -753,11 +677,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             currentName: displayName,
                           ),
                         ),
-                        const Divider(
-                          indent: 16,
-                          endIndent: 16,
-                          color: _mint,
-                        ),
+                        Divider(indent: 16, endIndent: 16, color: _border),
                         _settingTile(
                           icon: Icons.person_outline,
                           title: 'Username',
@@ -769,27 +689,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             currentUsername: username,
                           ),
                         ),
-                        const Divider(
-                          indent: 16,
-                          endIndent: 16,
-                          color: _mint,
-                        ),
+                        Divider(indent: 16, endIndent: 16, color: _border),
                         _settingTile(
                           icon: Icons.description_outlined,
                           title: 'Bio',
-                          subtitle:
-                              bio.isEmpty ? 'Add a bio' : bio,
-                          onTap: () => _editBio(
-                            uid: user.uid,
-                            currentBio: bio,
-                          ),
+                          subtitle: bio.isEmpty ? 'Add a bio' : bio,
+                          onTap: () => _editBio(uid: user.uid, currentBio: bio),
                         ),
                       ],
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Account information and password settings.
+                    // Account Settings.
                     _sectionCard(
                       title: 'Account Settings',
                       children: [
@@ -799,11 +711,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           subtitle: email,
                           onTap: () => _showEmail(email),
                         ),
-                        const Divider(
-                          indent: 16,
-                          endIndent: 16,
-                          color: _mint,
-                        ),
+                        Divider(indent: 16, endIndent: 16, color: _border),
                         _settingTile(
                           icon: Icons.lock_outline,
                           title: 'Password',
@@ -813,17 +721,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
 
+                    const SizedBox(height: 16),
+
+                    // App Settings.
+                    _sectionCard(
+                      title: 'App Settings',
+                      children: [
+                        _settingTile(
+                          icon: Icons.settings_outlined,
+                          title: 'Preferences',
+                          subtitle: 'Notifications, appearance, and plant reminder settings',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 20),
 
+                    // Log Out.
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: _forest,
-                          side: const BorderSide(color: _sage),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 14,
-                          ),
+                          foregroundColor: _accent,
+                          side: BorderSide(color: _border),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -851,16 +780,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Center(child: Text('Not logged in.'));
     }
 
-    // Theme is local to the profile to avoid changing teammate screens.
+    // Respect the selected Light/Dark/System mode.
+    final baseTheme = Theme.of(context);
+
     return Theme(
-      data: Theme.of(context).copyWith(
+      data: baseTheme.copyWith(
         colorScheme: ColorScheme.fromSeed(
           seedColor: _forest,
+          brightness: baseTheme.brightness,
         ),
         textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: _forest,
-          ),
+          style: TextButton.styleFrom(foregroundColor: _accent),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
@@ -872,17 +802,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: widget.insideHome
           ? _buildProfileContent(user)
           : Scaffold(
-              backgroundColor: _pale,
+              backgroundColor: _background,
               appBar: AppBar(
-                title: const Text(
+                title: Text(
                   'Profile',
-                  style: TextStyle(
-                    color: _forest,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: _text, fontWeight: FontWeight.bold),
                 ),
-                backgroundColor: _pale,
-                surfaceTintColor: _pale,
+                backgroundColor: _background,
+                foregroundColor: _text,
+                surfaceTintColor: Colors.transparent,
               ),
               drawer: const AppDrawer(),
               body: _buildProfileContent(user),

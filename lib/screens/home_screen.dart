@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -6,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/my_plant.dart';
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
 import '../widgets/notification_bell.dart';
 import '../widgets/reusable_widgets.dart';
 import '../widgets/watering.dart';
@@ -16,44 +16,52 @@ import 'plant_analysis_screen.dart';
 import 'plant_info_screen.dart';
 import 'profile_screen.dart';
 
-// PlantPal colors.
-const Color _forest = Color(0xFF315F43);
-const Color _sage = Color(0xFF83AD8A);
-const Color _pale = Color(0xFFF6F8F2);
-const Color _mint = Color(0xFFE0EBDD);
-const Color _ink = Color(0xFF24372A);
+// Shared PlantPal theme helpers.
+Color _background(BuildContext context) => PlantPalColors.background(context);
 
-// Rounded cards with PlantPal's green design.
-const RoundedRectangleBorder _cardShape = RoundedRectangleBorder(
-  borderRadius: BorderRadius.all(Radius.circular(20)),
-  side: BorderSide(color: _mint),
-);
+Color _cardColor(BuildContext context) => PlantPalColors.card(context);
 
-final Color _cardShadow = _forest.withValues(alpha: 0.12);
+Color _textColor(BuildContext context) => PlantPalColors.text(context);
 
-// Use the PlantPal colors throughout the dashboard.
-ThemeData _screenTheme(ThemeData base) => base.copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _forest,
-        primary: _forest,
+Color _secondaryText(BuildContext context) =>
+    PlantPalColors.secondaryText(context);
+
+Color _accent(BuildContext context) => PlantPalColors.accent(context);
+
+Color _border(BuildContext context) => PlantPalColors.border(context);
+
+RoundedRectangleBorder _cardShape(BuildContext context) {
+  return RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(20),
+    side: BorderSide(color: _border(context)),
+  );
+}
+
+// Preserve the active light or dark theme.
+ThemeData _screenTheme(ThemeData base) {
+  final isDark = base.brightness == Brightness.dark;
+
+  final accent = isDark ? PlantPalColors.darkAccent : PlantPalColors.forest;
+
+  return base.copyWith(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: PlantPalColors.forest,
+      brightness: base.brightness,
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: accent),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: PlantPalColors.forest,
+        foregroundColor: Colors.white,
       ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: _forest,
-        ),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: _forest,
-          foregroundColor: Colors.white,
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _forest,
-        ),
-      ),
-    );
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: accent),
+    ),
+  );
+}
 
 // Bottom navigation indexes.
 class HomeTabs {
@@ -64,14 +72,11 @@ class HomeTabs {
   static const int community = 4;
 
   // Allows other screens to switch tabs.
-  static final ValueNotifier<int> selected =
-      ValueNotifier(dashboard);
+  static final ValueNotifier<int> selected = ValueNotifier(dashboard);
 
-  // Return to HomeScreen and open the selected tab.
+  // Return to HomeScreen and open the requested tab.
   static void goTo(BuildContext context, int tab) {
-    Navigator.of(context).popUntil(
-      (route) => route.isFirst,
-    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
 
     selected.value = tab;
   }
@@ -84,15 +89,12 @@ String? currentUserId() {
   return FirebaseAuth.instance.currentUser?.uid;
 }
 
-// Main PlantPal home screen.
+// Main PlantPal Home screen.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({
-    super.key,
-  });
+  const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() =>
-      _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
@@ -115,25 +117,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Switch tabs when another screen requests it.
   void _onTabRequested() {
-    if (HomeTabs.selected.value != _selectedIndex ||
-        _showProfile) {
+    if (HomeTabs.selected.value != _selectedIndex || _showProfile) {
       _selectBottomTab(HomeTabs.selected.value);
     }
   }
 
   // Keep the screens in bottom-navigation order.
   List<Widget> get _screens => [
-        DashboardScreen(
-          onViewAllPlants: () =>
-              _selectBottomTab(HomeTabs.myPlants),
-        ),
-        const MyPlantsScreen(),
-        const UploadScreen(),
-        const PlantSearch(),
-        const CommunityScreen(),
-      ];
+    DashboardScreen(onViewAllPlants: () => _selectBottomTab(HomeTabs.myPlants)),
+    const MyPlantsScreen(),
+    const UploadScreen(),
+    const PlantSearch(),
+    const CommunityScreen(),
+  ];
 
-  // Open the profile from the drawer.
+  // Open Profile from the sidebar.
   void _openProfile() {
     setState(() {
       _showProfile = true;
@@ -152,65 +150,61 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final background = _background(context);
+    final cardColor = _cardColor(context);
+    final accent = _accent(context);
+    final secondary = _secondaryText(context);
+    final textColor = _textColor(context);
+
     return Scaffold(
+      backgroundColor: background,
+
+      // Top navigation now changes with light/dark mode.
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'PlantPal',
-          style: TextStyle(
-            color: _forest,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: accent, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: _pale,
-        surfaceTintColor: _pale,
-        foregroundColor: _forest,
+        backgroundColor: background,
+        foregroundColor: textColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
 
-        // Notification bell in the top-right corner.
-        actions: const [
-          NotificationBell(),
-          SizedBox(width: 12),
-        ],
+        // Existing notification bell.
+        actions: const [NotificationBell(), SizedBox(width: 12)],
       ),
 
-      drawer: AppDrawer(
-        onProfileTap: _openProfile,
-      ),
+      // Existing sidebar.
+      drawer: AppDrawer(onProfileTap: _openProfile),
 
+      // Keep all existing screens.
       body: _showProfile
-          ? const ProfileScreen(
-              insideHome: true,
-            )
+          ? const ProfileScreen(insideHome: true)
           : _screens[_selectedIndex],
 
+      // Bottom navigation now changes with dark mode.
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: _forest,
-        unselectedItemColor: _sage,
+        backgroundColor: cardColor,
+        selectedItemColor: accent,
+        unselectedItemColor: secondary,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        elevation: 4,
         onTap: _selectBottomTab,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Dashboard',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Dashboard'),
           BottomNavigationBarItem(
             icon: Icon(Icons.local_florist),
             label: 'My Plants',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.upload),
-            label: 'Upload',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.upload), label: 'Upload'),
           BottomNavigationBarItem(
             icon: Icon(Icons.search),
             label: 'Plant Search',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Community',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Community'),
         ],
       ),
     );
@@ -222,122 +216,89 @@ class _HomeScreenState extends State<HomeScreen> {
 class DashboardScreen extends StatefulWidget {
   final VoidCallback onViewAllPlants;
 
-  const DashboardScreen({
-    super.key,
-    required this.onViewAllPlants,
-  });
+  const DashboardScreen({super.key, required this.onViewAllPlants});
 
   @override
-  State<DashboardScreen> createState() =>
-      _DashboardScreenState();
+  State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final String? _userId = currentUserId();
 
   // Load the user's saved plants.
-  late final Stream<List<MyPlant>>? _myPlants =
-      _userId == null
-          ? null
-          : DatabaseService().getMyPlants(_userId);
+  late final Stream<List<MyPlant>>? _myPlants = _userId == null
+      ? null
+      : DatabaseService().getMyPlants(_userId);
 
   // Load plants for watering reminders.
-  late final Stream<List<MyPlant>>? _reminderPlants =
-      _userId == null
-          ? null
-          : DatabaseService().getMyPlants(_userId);
+  late final Stream<List<MyPlant>>? _reminderPlants = _userId == null
+      ? null
+      : DatabaseService().getMyPlants(_userId);
 
   // Load plants for the dashboard greeting.
-  late final Stream<List<MyPlant>>? _summaryPlants =
-      _userId == null
-          ? null
-          : DatabaseService().getMyPlants(_userId);
+  late final Stream<List<MyPlant>>? _summaryPlants = _userId == null
+      ? null
+      : DatabaseService().getMyPlants(_userId);
 
   // Load the user's profile information.
-  late final Stream<DocumentSnapshot<Map<String, dynamic>>>?
-      _userProfile = _userId == null
-          ? null
-          : DatabaseService().getUserStream(_userId);
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>>? _userProfile =
+      _userId == null ? null : DatabaseService().getUserStream(_userId);
 
   // Load recent Community posts.
-  late final Stream<QuerySnapshot<Map<String, dynamic>>>?
-      _recentPosts = _userId == null
-          ? null
-          : DatabaseService().getPosts();
+  late final Stream<QuerySnapshot<Map<String, dynamic>>>? _recentPosts =
+      _userId == null ? null : DatabaseService().getPosts();
 
   // Display a personalized greeting.
   Widget _buildGreeting(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-
     final hour = DateTime.now().hour;
 
     final greeting = hour < 12
         ? 'Good morning'
         : hour < 18
-            ? 'Good afternoon'
-            : 'Good evening';
+        ? 'Good afternoon'
+        : 'Good evening';
 
-    final greetingStyle =
-        textTheme.headlineSmall?.copyWith(
-      color: _pale,
+    // The greeting banner intentionally stays green.
+    // White text is readable in both appearance modes.
+    final greetingStyle = textTheme.headlineSmall?.copyWith(
+      color: Colors.white,
       fontWeight: FontWeight.w700,
     );
 
-    final summaryStyle =
-        textTheme.bodyMedium?.copyWith(
-      color: _mint,
+    final summaryStyle = textTheme.bodyMedium?.copyWith(
+      color: PlantPalColors.mint,
     );
 
-    // Green greeting banner.
     Widget banner(Widget child) => Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: _forest,
-            borderRadius: BorderRadius.all(
-              Radius.circular(20),
-            ),
-          ),
-          child: child,
-        );
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: PlantPalColors.forest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: child,
+    );
 
     if (_userId == null) {
-      return banner(
-        Text(
-          greeting,
-          style: greetingStyle,
-        ),
-      );
+      return banner(Text(greeting, style: greetingStyle));
     }
 
     return banner(
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StreamBuilder<
-              DocumentSnapshot<Map<String, dynamic>>>(
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: _userProfile,
             builder: (context, snapshot) {
               final data = snapshot.data?.data();
 
-              // Display name first, then username.
-              final name = [
-                data?['displayName'],
-                data?['username'],
-              ]
-                  .map(
-                    (value) =>
-                        (value ?? '').toString().trim(),
-                  )
-                  .firstWhere(
-                    (value) => value.isNotEmpty,
-                    orElse: () => '',
-                  );
+              final name = [data?['displayName'], data?['username']]
+                  .map((value) => (value ?? '').toString().trim())
+                  .firstWhere((value) => value.isNotEmpty, orElse: () => '');
 
               return Text(
-                name.isEmpty
-                    ? greeting
-                    : '$greeting, $name',
+                name.isEmpty ? greeting : '$greeting, $name',
                 style: greetingStyle,
               );
             },
@@ -354,10 +315,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return const SizedBox(height: 20);
               }
 
-              return Text(
-                plantSummary(plants),
-                style: summaryStyle,
-              );
+              return Text(plantSummary(plants), style: summaryStyle);
             },
           ),
         ],
@@ -368,60 +326,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Display the three newest Community posts.
   Widget _buildRecentPosts(BuildContext context) {
     if (_recentPosts == null) {
-      return const Text(
-        'Sign in to see community posts.',
-      );
+      return const Text('Sign in to see community posts.');
     }
 
-    return StreamBuilder<
-        QuerySnapshot<Map<String, dynamic>>>(
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: _recentPosts,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          debugPrint(
-            'Community posts error: ${snapshot.error}',
-          );
+          debugPrint('Community posts error: ${snapshot.error}');
 
-          return const Text(
-            'Could not load community posts.',
-          );
+          return const Text('Could not load community posts.');
         }
 
         if (!snapshot.hasData) {
           return const SizedBox(
             height: 80,
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final posts =
-            snapshot.data!.docs.take(3).toList();
+        final posts = snapshot.data!.docs.take(3).toList();
 
         if (posts.isEmpty) {
           return Card(
             margin: EdgeInsets.zero,
-            color: Colors.white,
+            color: _cardColor(context),
             elevation: 1,
-            shadowColor: _cardShadow,
-            shape: _cardShape,
+            shape: _cardShape(context),
             child: ListTile(
-              iconColor: _forest,
-              leading: const Icon(
-                Icons.forum_outlined,
+              iconColor: _accent(context),
+              leading: const Icon(Icons.forum_outlined),
+              title: Text(
+                'No posts yet',
+                style: TextStyle(color: _textColor(context)),
               ),
-              title: const Text('No posts yet'),
-              subtitle: const Text(
+              subtitle: Text(
                 'Be the first to share in Community.',
+                style: TextStyle(color: _secondaryText(context)),
               ),
-              trailing: const Icon(
-                Icons.chevron_right,
-              ),
-              onTap: () => HomeTabs.goTo(
-                context,
-                HomeTabs.community,
-              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => HomeTabs.goTo(context, HomeTabs.community),
             ),
           );
         }
@@ -430,15 +374,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             for (final post in posts)
               Padding(
-                padding: const EdgeInsets.only(
-                  bottom: 8,
-                ),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: _RecentPostTile(
                   data: post.data(),
-                  onTap: () => HomeTabs.goTo(
-                    context,
-                    HomeTabs.community,
-                  ),
+                  onTap: () => HomeTabs.goTo(context, HomeTabs.community),
                 ),
               ),
           ],
@@ -450,30 +389,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Display the user's saved plants.
   Widget _buildSavedPlants(BuildContext context) {
     if (_myPlants == null) {
-      return const Text(
-        'Sign in to see your saved plants.',
-      );
+      return const Text('Sign in to see your saved plants.');
     }
 
     return StreamBuilder<List<MyPlant>>(
       stream: _myPlants,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          debugPrint(
-            'My Plants error: ${snapshot.error}',
-          );
+          debugPrint('My Plants error: ${snapshot.error}');
 
-          return const Text(
-            'Could not load your plants.',
-          );
+          return const Text('Could not load your plants.');
         }
 
         if (!snapshot.hasData) {
           return const SizedBox(
             height: 80,
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -482,28 +413,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (plants.isEmpty) {
           return Card(
             margin: EdgeInsets.zero,
-            color: Colors.white,
+            color: _cardColor(context),
             elevation: 1,
-            shadowColor: _cardShadow,
-            shape: _cardShape,
+            shape: _cardShape(context),
             child: ListTile(
-              iconColor: _forest,
-              leading: const Icon(
-                Icons.local_florist_outlined,
-              ),
-              title: const Text(
+              iconColor: _accent(context),
+              leading: const Icon(Icons.local_florist_outlined),
+              title: Text(
                 'No saved plants yet',
+                style: TextStyle(color: _textColor(context)),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Search for a plant to add it.',
+                style: TextStyle(color: _secondaryText(context)),
               ),
-              trailing: const Icon(
-                Icons.chevron_right,
-              ),
-              onTap: () => HomeTabs.goTo(
-                context,
-                HomeTabs.search,
-              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => HomeTabs.goTo(context, HomeTabs.search),
             ),
           );
         }
@@ -513,16 +438,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: plants.length,
-            separatorBuilder: (context, index) =>
-                const SizedBox(width: 12),
-            itemBuilder: (context, index) =>
-                MyPlantCard(
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => MyPlantCard(
               plant: plants[index],
               compact: true,
-              onTap: () => openMyPlantDetails(
-                context,
-                plants[index],
-              ),
+              onTap: () => openMyPlantDetails(context, plants[index]),
             ),
           ),
         );
@@ -535,44 +455,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final userId = _userId;
 
     if (userId == null) {
-      return const Text(
-        'Sign in to get watering reminders.',
-      );
+      return const Text('Sign in to get watering reminders.');
     }
 
     return StreamBuilder<List<MyPlant>>(
       stream: _reminderPlants,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          debugPrint(
-            'Reminders error: ${snapshot.error}',
-          );
+          debugPrint('Reminders error: ${snapshot.error}');
 
-          return const Text(
-            'Could not load your reminders.',
-          );
+          return const Text('Could not load your reminders.');
         }
 
         if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
-        return WateringRemindersCard(
-          userId: userId,
-          plants: snapshot.data!,
-        );
+        // Keep the existing watering reminder widget.
+        return WateringRemindersCard(userId: userId, plants: snapshot.data!);
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final background = _background(context);
+    final cardColor = _cardColor(context);
+    final textColor = _textColor(context);
+    final accent = _accent(context);
+
     return Theme(
       data: _screenTheme(Theme.of(context)),
       child: ColoredBox(
-        color: _pale,
+        color: background,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -580,25 +495,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SizedBox(height: 16),
 
-            // Watering reminders card.
+            // Watering reminders section.
             Card(
               margin: EdgeInsets.zero,
-              color: Colors.white,
+              color: cardColor,
               elevation: 1,
-              shadowColor: _cardShadow,
-              shape: _cardShape,
+              shape: _cardShape(context),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Reminders',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: _ink,
+                        color: textColor,
                       ),
                     ),
 
@@ -612,25 +525,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SizedBox(height: 20),
 
-            // Saved plants section.
+            // Saved plants heading.
             Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Saved plants',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(
-                        color: _ink,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(color: textColor, fontWeight: FontWeight.w700),
                 ),
                 TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: _forest,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: accent),
                   onPressed: widget.onViewAllPlants,
                   child: const Text('View all'),
                 ),
@@ -643,29 +548,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SizedBox(height: 24),
 
-            // Community section.
+            // Community heading.
             Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   'Community',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(
-                        color: _ink,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(color: textColor, fontWeight: FontWeight.w700),
                 ),
                 TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: _forest,
-                  ),
-                  onPressed: () => HomeTabs.goTo(
-                    context,
-                    HomeTabs.community,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: accent),
+                  onPressed: () => HomeTabs.goTo(context, HomeTabs.community),
                   child: const Text('See all'),
                 ),
               ],
@@ -683,64 +577,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 // Compact preview of a Community post.
 class _RecentPostTile extends StatefulWidget {
-  const _RecentPostTile({
-    required this.data,
-    this.onTap,
-  });
+  const _RecentPostTile({required this.data, this.onTap});
 
   final Map<String, dynamic> data;
   final VoidCallback? onTap;
 
   @override
-  State<_RecentPostTile> createState() =>
-      _RecentPostTileState();
+  State<_RecentPostTile> createState() => _RecentPostTileState();
 }
 
 class _RecentPostTileState extends State<_RecentPostTile> {
   // Look up the post author's username.
-  late final Stream<
-      DocumentSnapshot<Map<String, dynamic>>>? _author =
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>>? _author =
       (widget.data['userId'] ?? '').toString().isEmpty
-          ? null
-          : DatabaseService().getUserStream(
-              widget.data['userId'].toString(),
-            );
+      ? null
+      : DatabaseService().getUserStream(widget.data['userId'].toString());
 
   @override
   Widget build(BuildContext context) {
     final data = widget.data;
 
-    final title =
-        (data['title'] ?? '').toString();
+    final title = (data['title'] ?? '').toString();
 
-    final description =
-        (data['description'] ?? '').toString();
+    final description = (data['description'] ?? '').toString();
 
-    final imageUrl =
-        (data['imageUrl'] ?? '').toString();
+    final imageUrl = (data['imageUrl'] ?? '').toString();
 
-    // Placeholder when there is no picture.
-    const placeholder = SizedBox(
+    final accent = _accent(context);
+
+    // Placeholder when a post has no picture.
+    final placeholder = SizedBox(
       width: 48,
       height: 48,
-      child: Icon(
-        Icons.forum_outlined,
-        color: _forest,
-      ),
+      child: Icon(Icons.forum_outlined, color: accent),
     );
 
-    return StreamBuilder<
-        DocumentSnapshot<Map<String, dynamic>>>(
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _author,
       builder: (context, snapshot) {
-        final username =
-            (snapshot.data?.data()?['username'] ?? '')
-                .toString()
-                .trim();
+        final username = (snapshot.data?.data()?['username'] ?? '')
+            .toString()
+            .trim();
 
-        final author = username.isNotEmpty
-            ? '@$username'
-            : 'PlantPal User';
+        final author = username.isNotEmpty ? '@$username' : 'PlantPal User';
 
         return _buildTile(
           title: title,
@@ -760,15 +639,19 @@ class _RecentPostTileState extends State<_RecentPostTile> {
     required String author,
     required Widget placeholder,
   }) {
+    final cardColor = _cardColor(context);
+    final textColor = _textColor(context);
+    final secondaryText = _secondaryText(context);
+    final accent = _accent(context);
+
     return Card(
       margin: EdgeInsets.zero,
-      color: Colors.white,
+      color: cardColor,
       elevation: 1,
-      shadowColor: _cardShadow,
-      shape: _cardShape,
+      shape: _cardShape(context),
       child: ListTile(
         onTap: widget.onTap,
-        iconColor: _forest,
+        iconColor: accent,
 
         leading: imageUrl.isEmpty
             ? placeholder
@@ -779,12 +662,7 @@ class _RecentPostTileState extends State<_RecentPostTile> {
                   width: 48,
                   height: 48,
                   fit: BoxFit.cover,
-                  errorBuilder: (
-                    context,
-                    error,
-                    stackTrace,
-                  ) =>
-                      placeholder,
+                  errorBuilder: (context, error, stackTrace) => placeholder,
                 ),
               ),
 
@@ -792,26 +670,19 @@ class _RecentPostTileState extends State<_RecentPostTile> {
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: _ink,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
         ),
 
         subtitle: Text(
-          [
-            if (description.isNotEmpty) description,
-            'by $author',
-          ].join('\n'),
+          [if (description.isNotEmpty) description, 'by $author'].join('\n'),
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: secondaryText),
         ),
 
         isThreeLine: description.isNotEmpty,
 
-        trailing: const Icon(
-          Icons.chevron_right,
-        ),
+        trailing: Icon(Icons.chevron_right, color: accent),
       ),
     );
   }

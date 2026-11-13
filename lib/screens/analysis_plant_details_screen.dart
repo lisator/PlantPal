@@ -17,22 +17,19 @@ const Color _ink = Color(0xFF24372A);
 // Forest icons, buttons, spinners, and care guide accents instead of
 // Flutter's default purple.
 ThemeData _screenTheme(ThemeData base) => base.copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _forest,
-        primary: _forest,
-        outlineVariant: _mint,
-      ),
-      dividerTheme: const DividerThemeData(color: _mint),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: _forest),
-      ),
-    );
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: _forest,
+    primary: _forest,
+    outlineVariant: _mint,
+  ),
+  dividerTheme: const DividerThemeData(color: _mint),
+  textButtonTheme: TextButtonThemeData(
+    style: TextButton.styleFrom(foregroundColor: _forest),
+  ),
+);
 
 class AnalysisPlantDetailsScreen extends StatelessWidget {
-  const AnalysisPlantDetailsScreen({
-    super.key,
-    required this.plant,
-  });
+  const AnalysisPlantDetailsScreen({super.key, required this.plant});
 
   final MyPlant plant;
 
@@ -45,10 +42,7 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Plant care',
-          style: TextStyle(
-            color: _forest,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
         ),
         backgroundColor: _pale,
         surfaceTintColor: _pale,
@@ -83,14 +77,9 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
               const SizedBox(height: 28),
 
               if (userId == null)
-                const Text(
-                  'Sign in to view plant health history.',
-                )
+                const Text('Sign in to view plant health history.')
               else
-                HealthHistory(
-                  userId: userId,
-                  plantId: plant.id,
-                ),
+                HealthHistory(userId: userId, plantId: plant.id),
             ],
           ),
         ),
@@ -100,9 +89,7 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
 }
 
 class _PlantHeader extends StatelessWidget {
-  const _PlantHeader({
-    required this.plant,
-  });
+  const _PlantHeader({required this.plant});
 
   final MyPlant plant;
 
@@ -136,19 +123,12 @@ class _PlantHeader extends StatelessWidget {
                 width: double.infinity,
                 height: 230,
                 fit: BoxFit.cover,
-                errorBuilder: (
-                  context,
-                  error,
-                  stackTrace,
-                ) {
+                errorBuilder: (context, error, stackTrace) {
                   return Container(
                     height: 230,
                     color: colors.primaryContainer,
                     alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.local_florist,
-                      size: 60,
-                    ),
+                    child: const Icon(Icons.local_florist, size: 60),
                   );
                 },
               ),
@@ -158,10 +138,8 @@ class _PlantHeader extends StatelessWidget {
 
           Text(
             plant.displayName,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: _ink,
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(context).textTheme.headlineMedium
+                ?.copyWith(color: _ink, fontWeight: FontWeight.w700),
           ),
 
           if (plant.nickname != null) ...[
@@ -176,9 +154,8 @@ class _PlantHeader extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               plant.scientificName,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontStyle: FontStyle.italic,
-                  ),
+              style: Theme.of(context).textTheme.bodyLarge
+                  ?.copyWith(fontStyle: FontStyle.italic),
             ),
           ],
         ],
@@ -188,9 +165,7 @@ class _PlantHeader extends StatelessWidget {
 }
 
 class _PlantInformation extends StatelessWidget {
-  const _PlantInformation({
-    required this.plant,
-  });
+  const _PlantInformation({required this.plant});
 
   final MyPlant plant;
 
@@ -201,10 +176,8 @@ class _PlantInformation extends StatelessWidget {
       children: [
         Text(
           'My Plant',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: _ink,
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(color: _ink, fontWeight: FontWeight.w700),
         ),
 
         const SizedBox(height: 12),
@@ -262,9 +235,9 @@ class _AnalysisCareGuideState extends State<_AnalysisCareGuide> {
           commonName: widget.plant.commonName,
         )
         .catchError((Object e) {
-      debugPrint('Perenual lookup for analysis plant failed: $e');
-      return null;
-    });
+          debugPrint('Perenual lookup for analysis plant failed: $e');
+          return null;
+        });
     _wikipedia = loadWikipediaFor(
       scientificName: widget.plant.scientificName,
       commonName: widget.plant.commonName,
@@ -273,12 +246,13 @@ class _AnalysisCareGuideState extends State<_AnalysisCareGuide> {
 
   /// Names only, for plants Perenual doesn't have, so Wikipedia can still
   /// be searched.
-  PlantDetails get _namesOnly => PlantDetails.basic(PlantSearchResult(
-        id: -1,
-        commonName: widget.plant.commonName,
-        scientificName: widget.plant.scientificName,
-      ));
-
+  PlantDetails get _namesOnly => PlantDetails.basic(
+    PlantSearchResult(
+      id: -1,
+      commonName: widget.plant.commonName,
+      scientificName: widget.plant.scientificName,
+    ),
+  );
 
   /// Where the care info comes from, when it isn't simply this plant's
   /// Perenual entry.
@@ -336,16 +310,11 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -353,9 +322,7 @@ class _InfoRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),
                 Text(value),

@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -27,15 +26,11 @@ class DatabaseService {
     });
   }
 
-  Future<DocumentSnapshot<Map<String, dynamic>>> getUser(
-    String uid,
-  ) async {
+  Future<DocumentSnapshot<Map<String, dynamic>>> getUser(String uid) async {
     return await _db.collection('users').doc(uid).get();
   }
 
-  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(
-    String uid,
-  ) {
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserStream(String uid) {
     return _db.collection('users').doc(uid).snapshots();
   }
 
@@ -87,8 +82,7 @@ class DatabaseService {
       return true;
     }
 
-    if (currentUid != null &&
-        result.docs.first.id == currentUid) {
+    if (currentUid != null && result.docs.first.id == currentUid) {
       return true;
     }
 
@@ -111,8 +105,7 @@ class DatabaseService {
 
     if (username != null) {
       updates['username'] = username.trim();
-      updates['usernameLower'] =
-          username.trim().toLowerCase();
+      updates['usernameLower'] = username.trim().toLowerCase();
     }
 
     if (bio != null) {
@@ -132,14 +125,10 @@ class DatabaseService {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null || currentUser.uid != uid) {
-      throw StateError(
-        'You can only change your own profile picture.',
-      );
+      throw StateError('You can only change your own profile picture.');
     }
 
-    await _db.collection('users').doc(uid).update({
-      'photoUrl': photoUrl,
-    });
+    await _db.collection('users').doc(uid).update({'photoUrl': photoUrl});
   }
 
   // FOLLOWING
@@ -214,9 +203,7 @@ class DatabaseService {
     await batch.commit();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getFollowing(
-    String userId,
-  ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getFollowing(String userId) {
     return _db
         .collection('users')
         .doc(userId)
@@ -224,9 +211,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getFollowers(
-    String userId,
-  ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getFollowers(String userId) {
     return _db
         .collection('users')
         .doc(userId)
@@ -247,9 +232,7 @@ class DatabaseService {
   }
 
   // Find people followed by accounts you follow.
-  Future<Map<String, int>> getSuggestedUserScores(
-    String uid,
-  ) async {
+  Future<Map<String, int>> getSuggestedUserScores(String uid) async {
     final following = await _db
         .collection('users')
         .doc(uid)
@@ -257,10 +240,7 @@ class DatabaseService {
         .limit(40)
         .get();
 
-    final excluded = <String>{
-      uid,
-      ...following.docs.map((doc) => doc.id),
-    };
+    final excluded = <String>{uid, ...following.docs.map((doc) => doc.id)};
 
     final scores = <String, int>{};
 
@@ -274,11 +254,7 @@ class DatabaseService {
 
       for (final other in theirFollowing.docs) {
         if (!excluded.contains(other.id)) {
-          scores.update(
-            other.id,
-            (score) => score + 1,
-            ifAbsent: () => 1,
-          );
+          scores.update(other.id, (score) => score + 1, ifAbsent: () => 1);
         }
       }
     }
@@ -298,13 +274,10 @@ class DatabaseService {
     String imageUrl = '',
     List<String>? imageUrls,
   }) async {
-    final photos = imageUrls ??
-        (imageUrl.isNotEmpty ? [imageUrl] : <String>[]);
+    final photos = imageUrls ?? (imageUrl.isNotEmpty ? [imageUrl] : <String>[]);
 
     if (photos.length > 5) {
-      throw ArgumentError(
-        'A post can have no more than 5 pictures.',
-      );
+      throw ArgumentError('A post can have no more than 5 pictures.');
     }
 
     await _db.collection('posts').add({
@@ -330,9 +303,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getPostsByUser(
-    String userId,
-  ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getPostsByUser(String userId) {
     return _db
         .collection('posts')
         .where('userId', isEqualTo: userId)
@@ -340,13 +311,8 @@ class DatabaseService {
   }
 
   // Get a specific post, including bookmarked posts.
-  Future<DocumentSnapshot<Map<String, dynamic>>> getPost(
-    String postId,
-  ) async {
-    return await _db
-        .collection('posts')
-        .doc(postId)
-        .get();
+  Future<DocumentSnapshot<Map<String, dynamic>>> getPost(String postId) async {
+    return await _db.collection('posts').doc(postId).get();
   }
 
   // Edit only your own post.
@@ -365,9 +331,7 @@ class DatabaseService {
     final post = await postRef.get();
 
     if (!post.exists || post.data()?['userId'] != uid) {
-      throw StateError(
-        'You can only edit your own posts.',
-      );
+      throw StateError('You can only edit your own posts.');
     }
 
     final newTitle = title.trim();
@@ -401,9 +365,7 @@ class DatabaseService {
     final post = await postRef.get();
 
     if (!post.exists || post.data()?['userId'] != uid) {
-      throw StateError(
-        'You can only delete your own posts.',
-      );
+      throw StateError('You can only delete your own posts.');
     }
 
     await postRef.delete();
@@ -420,17 +382,13 @@ class DatabaseService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (uid == null || uid != userId) {
-      throw StateError(
-        'You must be logged in to comment.',
-      );
+      throw StateError('You must be logged in to comment.');
     }
 
     final newComment = comment.trim();
 
     if (newComment.isEmpty || newComment.length > 500) {
-      throw ArgumentError(
-        'Comment must be 1-500 characters.',
-      );
+      throw ArgumentError('Comment must be 1-500 characters.');
     }
 
     final createdComment = await _db
@@ -438,21 +396,17 @@ class DatabaseService {
         .doc(postId)
         .collection('comments')
         .add({
-      'userId': userId,
-      'userEmail': userEmail,
-      'comment': newComment,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+          'userId': userId,
+          'userEmail': userEmail,
+          'comment': newComment,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
     // Notify the author of the original post.
     try {
-      final post = await _db
-          .collection('posts')
-          .doc(postId)
-          .get();
+      final post = await _db.collection('posts').doc(postId).get();
 
-      final recipientId =
-          (post.data()?['userId'] ?? '').toString();
+      final recipientId = (post.data()?['userId'] ?? '').toString();
 
       await NotificationService().comment(
         actorId: userId,
@@ -465,9 +419,7 @@ class DatabaseService {
     }
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getComments(
-    String postId,
-  ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getComments(String postId) {
     return _db
         .collection('posts')
         .doc(postId)
@@ -495,20 +447,14 @@ class DatabaseService {
 
     final existingComment = await commentRef.get();
 
-    if (!existingComment.exists ||
-        existingComment.data()?['userId'] != uid) {
-      throw StateError(
-        'You can only edit your own comments.',
-      );
+    if (!existingComment.exists || existingComment.data()?['userId'] != uid) {
+      throw StateError('You can only edit your own comments.');
     }
 
     final updatedComment = comment.trim();
 
-    if (updatedComment.isEmpty ||
-        updatedComment.length > 500) {
-      throw ArgumentError(
-        'Comment must be 1-500 characters.',
-      );
+    if (updatedComment.isEmpty || updatedComment.length > 500) {
+      throw ArgumentError('Comment must be 1-500 characters.');
     }
 
     await commentRef.update({
@@ -535,11 +481,8 @@ class DatabaseService {
 
     final existingComment = await commentRef.get();
 
-    if (!existingComment.exists ||
-        existingComment.data()?['userId'] != uid) {
-      throw StateError(
-        'You can only delete your own comments.',
-      );
+    if (!existingComment.exists || existingComment.data()?['userId'] != uid) {
+      throw StateError('You can only delete your own comments.');
     }
 
     await commentRef.delete();
@@ -556,20 +499,13 @@ class DatabaseService {
         .doc(postId)
         .collection('likes')
         .doc(userId)
-        .set({
-      'userId': userId,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+        .set({'userId': userId, 'createdAt': FieldValue.serverTimestamp()});
 
     // Notify the post author.
     try {
-      final post = await _db
-          .collection('posts')
-          .doc(postId)
-          .get();
+      final post = await _db.collection('posts').doc(postId).get();
 
-      final recipientId =
-          (post.data()?['userId'] ?? '').toString();
+      final recipientId = (post.data()?['userId'] ?? '').toString();
 
       await NotificationService().like(
         actorId: userId,
@@ -605,14 +541,8 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getLikes(
-    String postId,
-  ) {
-    return _db
-        .collection('posts')
-        .doc(postId)
-        .collection('likes')
-        .snapshots();
+  Stream<QuerySnapshot<Map<String, dynamic>>> getLikes(String postId) {
+    return _db.collection('posts').doc(postId).collection('likes').snapshots();
   }
 
   // SAVED POSTS
@@ -626,10 +556,7 @@ class DatabaseService {
         .doc(userId)
         .collection('savedPosts')
         .doc(postId)
-        .set({
-      'postId': postId,
-      'savedAt': FieldValue.serverTimestamp(),
-    });
+        .set({'postId': postId, 'savedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> unsavePost({
@@ -656,9 +583,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getSavedPosts(
-    String userId,
-  ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getSavedPosts(String userId) {
     return _db
         .collection('users')
         .doc(userId)
@@ -705,10 +630,10 @@ class DatabaseService {
         .collection('myPlants')
         .doc(plantId)
         .update({
-      'lastWateredAt': at == null
-          ? Timestamp.now()
-          : Timestamp.fromDate(at),
-    });
+          'lastWateredAt': at == null
+              ? Timestamp.now()
+              : Timestamp.fromDate(at),
+        });
   }
 
   // Change the plant's watering schedule.
@@ -722,14 +647,10 @@ class DatabaseService {
         .doc(userId)
         .collection('myPlants')
         .doc(plantId)
-        .update({
-      'waterEveryDays': days,
-    });
+        .update({'waterEveryDays': days});
   }
 
-  Stream<List<MyPlant>> getMyPlants(
-    String userId,
-  ) {
+  Stream<List<MyPlant>> getMyPlants(String userId) {
     return _db
         .collection('users')
         .doc(userId)
@@ -739,19 +660,13 @@ class DatabaseService {
         .map(
           (snapshot) => snapshot.docs
               .map(
-                (doc) => MyPlant.fromFirestore({
-                  ...doc.data(),
-                  'id': doc.id,
-                }),
+                (doc) => MyPlant.fromFirestore({...doc.data(), 'id': doc.id}),
               )
               .toList(),
         );
   }
 
-  Stream<bool> isInMyPlants({
-    required String userId,
-    required int perenualId,
-  }) {
+  Stream<bool> isInMyPlants({required String userId, required int perenualId}) {
     return _db
         .collection('users')
         .doc(userId)
@@ -781,15 +696,15 @@ class DatabaseService {
         .doc(plantId)
         .collection('analyses')
         .add({
-      'scientificName': scientificName,
-      'commonName': commonName,
-      'confidence': confidence,
-      'healthStatus': healthStatus,
-      'issues': issues,
-      'recommendedCare': recommendedCare,
-      'imageUrl': imageUrl,
-      'analyzedAt': FieldValue.serverTimestamp(),
-    });
+          'scientificName': scientificName,
+          'commonName': commonName,
+          'confidence': confidence,
+          'healthStatus': healthStatus,
+          'issues': issues,
+          'recommendedCare': recommendedCare,
+          'imageUrl': imageUrl,
+          'analyzedAt': FieldValue.serverTimestamp(),
+        });
 
     // Notify the owner that an analysis was saved.
     try {
@@ -826,11 +741,7 @@ class DatabaseService {
     required String description,
     String? imageUrl,
   }) async {
-    await _db
-        .collection('users')
-        .doc(userID)
-        .collection('plants')
-        .add({
+    await _db.collection('users').doc(userID).collection('plants').add({
       'userID': userID,
       'name': name,
       'species': species,
@@ -840,9 +751,7 @@ class DatabaseService {
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> getUserPlants(
-    String userID,
-  ) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> getUserPlants(String userID) {
     return _db
         .collection('users')
         .doc(userID)

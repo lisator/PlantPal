@@ -95,127 +95,117 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
     }
   }
 
- Future<void> _startLightingCheck() async {
-  final controller = _controller;
+  Future<void> _startLightingCheck() async {
+    final controller = _controller;
 
-  if (controller == null ||
-      !controller.value.isInitialized ||
-      controller.value.isStreamingImages) {
-    return;
-  }
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        controller.value.isStreamingImages) {
+      return;
+    }
 
-  try {
-    await controller.startImageStream((CameraImage image) {
-      _frameCounter++;
+    try {
+      await controller.startImageStream((CameraImage image) {
+        _frameCounter++;
 
-      // Only analyze every 12th frame.
-      if (_frameCounter % 12 != 0) {
-        return;
-      }
+        // Only analyze every 12th frame.
+        if (_frameCounter % 12 != 0) {
+          return;
+        }
 
-      if (image.planes.isEmpty) {
-        return;
-      }
+        if (image.planes.isEmpty) {
+          return;
+        }
 
-      final plane = image.planes.first;
-      final bytes = plane.bytes;
+        final plane = image.planes.first;
+        final bytes = plane.bytes;
 
-      if (bytes.isEmpty) {
-        return;
-      }
+        if (bytes.isEmpty) {
+          return;
+        }
 
-      // ---------------------------------------------------------
-      // BRIGHTNESS CHECK
-      // ---------------------------------------------------------
-      int totalBrightness = 0;
-      int brightnessSamples = 0;
+        // ---------------------------------------------------------
+        // BRIGHTNESS CHECK
+        // ---------------------------------------------------------
+        int totalBrightness = 0;
+        int brightnessSamples = 0;
 
-      for (int i = 0; i < bytes.length; i += 50) {
-        totalBrightness += bytes[i];
-        brightnessSamples++;
-      }
+        for (int i = 0; i < bytes.length; i += 50) {
+          totalBrightness += bytes[i];
+          brightnessSamples++;
+        }
 
-      if (brightnessSamples == 0) {
-        return;
-      }
+        if (brightnessSamples == 0) {
+          return;
+        }
 
-      final averageBrightness =
-          totalBrightness / brightnessSamples;
+        final averageBrightness = totalBrightness / brightnessSamples;
 
-      // ---------------------------------------------------------
-      // SHARPNESS / DETAIL CHECK
-      // ---------------------------------------------------------
-      double totalDifference = 0;
-      int differenceSamples = 0;
+        // ---------------------------------------------------------
+        // SHARPNESS / DETAIL CHECK
+        // ---------------------------------------------------------
+        double totalDifference = 0;
+        int differenceSamples = 0;
 
-      const sampleGap = 20;
+        const sampleGap = 20;
 
-      for (
-        int i = 0;
-        i < bytes.length - sampleGap;
-        i += 100
-      ) {
-        final current = bytes[i].toInt();
-        final nearby = bytes[i + sampleGap].toInt();
+        for (int i = 0; i < bytes.length - sampleGap; i += 100) {
+          final current = bytes[i].toInt();
+          final nearby = bytes[i + sampleGap].toInt();
 
-        totalDifference +=
-            (current - nearby).abs();
+          totalDifference += (current - nearby).abs();
 
-        differenceSamples++;
-      }
+          differenceSamples++;
+        }
 
-      final sharpnessScore =
-          differenceSamples == 0
-              ? 0.0
-              : totalDifference / differenceSamples;
+        final sharpnessScore = differenceSamples == 0
+            ? 0.0
+            : totalDifference / differenceSamples;
 
-      debugPrint(
-        'Brightness: ${averageBrightness.toStringAsFixed(1)} '
-        'Sharpness: ${sharpnessScore.toStringAsFixed(1)}',
-      );
+        debugPrint(
+          'Brightness: ${averageBrightness.toStringAsFixed(1)} '
+          'Sharpness: ${sharpnessScore.toStringAsFixed(1)}',
+        );
 
-      Color newColor;
-      String newMessage;
-      IconData newIcon;
+        Color newColor;
+        String newMessage;
+        IconData newIcon;
 
-      // ---------------------------------------------------------
-      // QUALITY RESULT
-      // ---------------------------------------------------------
-      if (averageBrightness < 70) {
-        newColor = Colors.red;
-        newMessage =
-            'Too dark — move to a brighter area';
-        newIcon = Icons.brightness_low;
-      } else if (averageBrightness > 210) {
-        newColor = Colors.orange;
-        newMessage =
-            'Too bright — avoid harsh light';
-        newIcon = Icons.brightness_high;
-      } else if (sharpnessScore < 8) {
-        newColor = Colors.red;
-        newMessage =
-            'Photo looks blurry — hold the camera steady';
-        newIcon = Icons.blur_on;
-      } else {
-        newColor = Colors.green;
-        newMessage = 'Photo looks good!';
-        newIcon = Icons.check_circle_outline;
-      }
+        // ---------------------------------------------------------
+        // QUALITY RESULT
+        // ---------------------------------------------------------
+        if (averageBrightness < 70) {
+          newColor = Colors.red;
+          newMessage = 'Too dark — move to a brighter area';
+          newIcon = Icons.brightness_low;
+        } else if (averageBrightness > 210) {
+          newColor = Colors.orange;
+          newMessage = 'Too bright — avoid harsh light';
+          newIcon = Icons.brightness_high;
+        } else if (sharpnessScore < 8) {
+          newColor = Colors.red;
+          newMessage = 'Photo looks blurry — hold the camera steady';
+          newIcon = Icons.blur_on;
+        } else {
+          newColor = Colors.green;
+          newMessage = 'Photo looks good!';
+          newIcon = Icons.check_circle_outline;
+        }
 
-      if (!mounted) {
-        return;
-      }
+        if (!mounted) {
+          return;
+        }
 
-      setState(() {
-        _guideColor = newColor;
-        _qualityMessage = newMessage;
-        _qualityIcon = newIcon;
+        setState(() {
+          _guideColor = newColor;
+          _qualityMessage = newMessage;
+          _qualityIcon = newIcon;
+        });
       });
-    });
-  } catch (e) {
-    debugPrint('Camera quality check error: $e');
+    } catch (e) {
+      debugPrint('Camera quality check error: $e');
+    }
   }
-}
 
   Future<void> _takePicture() async {
     final controller = _controller;
@@ -237,16 +227,15 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
 
       final XFile image = await controller.takePicture();
 
-
       if (!mounted) return;
 
       Navigator.pop(context, image);
     } catch (e) {
       debugPrint('Take picture error: $e');
 
-    if (mounted) {
-      await _startLightingCheck();
-    }
+      if (mounted) {
+        await _startLightingCheck();
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -272,9 +261,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
     final newValue = !_flashEnabled;
 
     try {
-      await controller.setFlashMode(
-        newValue ? FlashMode.auto : FlashMode.off,
-      );
+      await controller.setFlashMode(newValue ? FlashMode.auto : FlashMode.off);
 
       if (!mounted) return;
 
@@ -289,8 +276,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
   Future<void> _switchCamera() async {
     if (_cameras.length < 2) return;
 
-    final nextIndex =
-        (_selectedCameraIndex + 1) % _cameras.length;
+    final nextIndex = (_selectedCameraIndex + 1) % _cameras.length;
 
     setState(() {
       _isInitializing = true;
@@ -310,14 +296,11 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
     if (_isInitializing) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_controller == null ||
-        !_controller!.value.isInitialized) {
+    if (_controller == null || !_controller!.value.isInitialized) {
       return Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
@@ -327,10 +310,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
         body: const Center(
           child: Text(
             'Camera unavailable.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 18),
           ),
         ),
       );
@@ -345,16 +325,12 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
             // ----------------------------------------------------------
             // CAMERA PREVIEW
             // ----------------------------------------------------------
-            Center(
-              child: CameraPreview(_controller!),
-            ),
+            Center(child: CameraPreview(_controller!)),
 
             // ----------------------------------------------------------
             // DARK OVERLAY
             // ----------------------------------------------------------
-            Container(
-              color: Colors.black.withValues(alpha: 0.12),
-            ),
+            Container(color: Colors.black.withValues(alpha: 0.12)),
 
             // ----------------------------------------------------------
             // TOP BUTTONS
@@ -372,9 +348,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
               top: 12,
               right: 16,
               child: _CameraButton(
-                icon: _flashEnabled
-                    ? Icons.flash_auto
-                    : Icons.flash_off,
+                icon: _flashEnabled ? Icons.flash_auto : Icons.flash_off,
                 onTap: _toggleFlash,
               ),
             ),
@@ -395,12 +369,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black,
-                          blurRadius: 8,
-                        ),
-                      ],
+                      shadows: [Shadow(color: Colors.black, blurRadius: 8)],
                     ),
                   ),
                   SizedBox(height: 6),
@@ -410,12 +379,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 14,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black,
-                          blurRadius: 8,
-                        ),
-                      ],
+                      shadows: [Shadow(color: Colors.black, blurRadius: 8)],
                     ),
                   ),
                 ],
@@ -431,10 +395,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
                 height: MediaQuery.of(context).size.width * 0.90,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(
-                    color: _guideColor,
-                    width: 4,
-                  ),
+                  border: Border.all(color: _guideColor, width: 4),
                 ),
               ),
             ),
@@ -458,11 +419,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      _qualityIcon,
-                      color: _guideColor,
-                      size: 20,
-                    ),
+                    Icon(_qualityIcon, color: _guideColor, size: 20),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
@@ -492,17 +449,13 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
                   const SizedBox(width: 56),
 
                   GestureDetector(
-                    onTap:
-                        _isTakingPicture ? null : _takePicture,
+                    onTap: _isTakingPicture ? null : _takePicture,
                     child: Container(
                       width: 78,
                       height: 78,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 5,
-                        ),
+                        border: Border.all(color: Colors.white, width: 5),
                       ),
                       padding: const EdgeInsets.all(6),
                       child: Container(
@@ -513,8 +466,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
                         child: _isTakingPicture
                             ? const Padding(
                                 padding: EdgeInsets.all(16),
-                                child:
-                                    CircularProgressIndicator(
+                                child: CircularProgressIndicator(
                                   color: Colors.white,
                                   strokeWidth: 3,
                                 ),
@@ -526,8 +478,7 @@ class _PlantCameraScreenState extends State<PlantCameraScreen> {
 
                   _CameraButton(
                     icon: Icons.cameraswitch_outlined,
-                    onTap:
-                        _cameras.length > 1 ? _switchCamera : null,
+                    onTap: _cameras.length > 1 ? _switchCamera : null,
                   ),
                 ],
               ),
@@ -543,10 +494,7 @@ class _CameraButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
-  const _CameraButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _CameraButton({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -558,11 +506,7 @@ class _CameraButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 27,
-          ),
+          child: Icon(icon, color: Colors.white, size: 27),
         ),
       ),
     );

@@ -1,17 +1,12 @@
-
 import 'package:flutter/material.dart';
 
 class PostPhotoGallery extends StatefulWidget {
   final List<String> imageUrls;
 
-  const PostPhotoGallery({
-    super.key,
-    required this.imageUrls,
-  });
+  const PostPhotoGallery({super.key, required this.imageUrls});
 
   @override
-  State<PostPhotoGallery> createState() =>
-      _PostPhotoGalleryState();
+  State<PostPhotoGallery> createState() => _PostPhotoGalleryState();
 }
 
 class _PostPhotoGalleryState extends State<PostPhotoGallery> {
@@ -52,8 +47,7 @@ class _PostPhotoGalleryState extends State<PostPhotoGallery> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            FullScreenPhotoViewer(
+                        builder: (context) => FullScreenPhotoViewer(
                           images: images,
                           initialIndex: index,
                         ),
@@ -69,9 +63,7 @@ class _PostPhotoGalleryState extends State<PostPhotoGallery> {
                         if (progress == null) return child;
 
                         return const Center(
-                          child: CircularProgressIndicator(
-                            color: _forest,
-                          ),
+                          child: CircularProgressIndicator(color: _forest),
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
@@ -96,10 +88,7 @@ class _PostPhotoGalleryState extends State<PostPhotoGallery> {
 
           Text(
             '${_currentIndex + 1} of ${images.length}',
-            style: const TextStyle(
-              color: _forest,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(color: _forest, fontWeight: FontWeight.w600),
           ),
         ],
       ],
@@ -120,12 +109,10 @@ class FullScreenPhotoViewer extends StatefulWidget {
   });
 
   @override
-  State<FullScreenPhotoViewer> createState() =>
-      _FullScreenPhotoViewerState();
+  State<FullScreenPhotoViewer> createState() => _FullScreenPhotoViewerState();
 }
 
-class _FullScreenPhotoViewerState
-    extends State<FullScreenPhotoViewer> {
+class _FullScreenPhotoViewerState extends State<FullScreenPhotoViewer> {
   late final PageController _pageController;
   late int _currentIndex;
 
@@ -135,9 +122,7 @@ class _FullScreenPhotoViewerState
 
     _currentIndex = widget.initialIndex;
 
-    _pageController = PageController(
-      initialPage: widget.initialIndex,
-    );
+    _pageController = PageController(initialPage: widget.initialIndex);
   }
 
   @override
@@ -153,9 +138,7 @@ class _FullScreenPhotoViewerState
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text(
-          '${_currentIndex + 1} of ${widget.images.length}',
-        ),
+        title: Text('${_currentIndex + 1} of ${widget.images.length}'),
         actions: [
           IconButton(
             tooltip: 'Close picture',
@@ -186,9 +169,7 @@ class _FullScreenPhotoViewerState
                   if (progress == null) return child;
 
                   return const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.white),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {

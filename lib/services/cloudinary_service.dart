@@ -12,45 +12,30 @@ class CloudinaryService {
       'https://api.cloudinary.com/v1_1/$cloudName/image/upload',
     );
 
-    final request = http.MultipartRequest(
-      'POST',
-      uploadUrl,
-    );
+    final request = http.MultipartRequest('POST', uploadUrl);
 
     request.fields['upload_preset'] = uploadPreset;
 
     final bytes = await image.readAsBytes();
 
     request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: image.name,
-      ),
+      http.MultipartFile.fromBytes('file', bytes, filename: image.name),
     );
 
     final streamedResponse = await request.send();
 
-    final response = await http.Response.fromStream(
-      streamedResponse,
-    );
+    final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode != 200) {
-      throw Exception(
-        'Image upload failed: ${response.body}',
-      );
+      throw Exception('Image upload failed: ${response.body}');
     }
 
-    final Map<String, dynamic> data =
-        jsonDecode(response.body);
+    final Map<String, dynamic> data = jsonDecode(response.body);
 
-    final String? imageUrl =
-        data['secure_url'] as String?;
+    final String? imageUrl = data['secure_url'] as String?;
 
     if (imageUrl == null || imageUrl.isEmpty) {
-      throw Exception(
-        'Cloudinary did not return an image URL.',
-      );
+      throw Exception('Cloudinary did not return an image URL.');
     }
 
     return imageUrl;

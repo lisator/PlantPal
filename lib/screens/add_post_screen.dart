@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/cloudinary_service.dart';
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
 
 class AddPostScreen extends StatefulWidget {
   const AddPostScreen({super.key});
@@ -16,6 +17,7 @@ class AddPostScreen extends StatefulWidget {
 class _AddPostScreenState extends State<AddPostScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+
   final _databaseService = DatabaseService();
   final _cloudinaryService = CloudinaryService();
   final _imagePicker = ImagePicker();
@@ -29,13 +31,18 @@ class _AddPostScreenState extends State<AddPostScreen> {
   static const int _maxPhotos = 5;
   static const int _maxImageBytes = 10 * 1024 * 1024;
 
-  static const Color _forest = Color(0xFF315F43);
-  static const Color _sage = Color(0xFF83AD8A);
-  static const Color _pale = Color(0xFFF6F8F2);
-  static const Color _mint = Color(0xFFE0EBDD);
-  static const Color _ink = Color(0xFF24372A);
+  static const Color _forest = PlantPalColors.forest;
 
   bool get _busy => _isPosting || _isSelectingImage;
+
+  // Colors automatically change based on appearance.
+  Color get _background => PlantPalColors.background(context);
+  Color get _card => PlantPalColors.card(context);
+  Color get _text => PlantPalColors.text(context);
+  Color get _secondary => PlantPalColors.secondaryText(context);
+  Color get _accent => PlantPalColors.accent(context);
+  Color get _border => PlantPalColors.border(context);
+  Color get _soft => PlantPalColors.softBackground(context);
 
   @override
   void dispose() {
@@ -46,13 +53,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
   void _showMessage(String message) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
-  // Check file size and basic image format.
-  // We never reject a photo for its lighting or subject.
+  // Check file size and image format.
   Future<bool> _validateImage(XFile image) async {
     try {
       final size = await image.length();
@@ -81,7 +88,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
     }
   }
 
-  // Add photos to the existing selection.
+  // Add valid images to the selected photos.
   Future<void> _addSelectedImages(List<XFile> images) async {
     var added = 0;
     var skipped = 0;
@@ -121,7 +128,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
     }
   }
 
-  // Choose multiple photos from the gallery.
+  // Select multiple photos from the gallery.
   Future<void> _pickImageFromGallery() async {
     if (_busy) return;
 
@@ -130,7 +137,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
       return;
     }
 
-    setState(() => _isSelectingImage = true);
+    setState(() {
+      _isSelectingImage = true;
+    });
 
     try {
       final images = await _imagePicker.pickMultiImage(
@@ -145,13 +154,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
       _showMessage('Unable to select pictures: $e');
     } finally {
       if (mounted) {
-        setState(() => _isSelectingImage = false);
+        setState(() {
+          _isSelectingImage = false;
+        });
       }
     }
   }
 
-  // Show a preview after taking a photo.
-  // The user can accept it, retake it, or cancel.
+  // Review a photo after taking it.
   Future<String?> _reviewCapturedPhoto(XFile image) async {
     final bytes = await image.readAsBytes();
 
@@ -161,7 +171,11 @@ class _AddPostScreenState extends State<AddPostScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('How does your picture look?'),
+          backgroundColor: _card,
+          title: Text(
+            'How does your picture look?',
+            style: TextStyle(color: _text),
+          ),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -180,12 +194,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 12),
-                const Text(
+
+                Text(
                   'You can use this picture even if '
                   'the lighting is not perfect.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: _ink, fontSize: 13),
+                  style: TextStyle(color: _secondary, fontSize: 13),
                 ),
               ],
             ),
@@ -195,13 +211,19 @@ class _AddPostScreenState extends State<AddPostScreen> {
               onPressed: () => Navigator.pop(dialogContext, 'cancel'),
               child: const Text('Cancel'),
             ),
+
             TextButton.icon(
               onPressed: () => Navigator.pop(dialogContext, 'retake'),
               icon: const Icon(Icons.refresh),
               label: const Text('Retake'),
             ),
+
             FilledButton.icon(
               onPressed: () => Navigator.pop(dialogContext, 'use'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _forest,
+                foregroundColor: Colors.white,
+              ),
               icon: const Icon(Icons.check),
               label: const Text('Use Photo'),
             ),
@@ -211,7 +233,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
     );
   }
 
-  // Take photos using the Community camera flow.
+  // Take a photo and allow retaking it.
   Future<void> _takePhoto() async {
     if (_busy) return;
 
@@ -220,14 +242,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
       return;
     }
 
-    setState(() => _isSelectingImage = true);
+    setState(() {
+      _isSelectingImage = true;
+    });
 
     try {
       bool takingPhoto = true;
 
       while (takingPhoto && mounted) {
-        // Mobile opens the native camera.
-        // Web support depends on the browser/device.
         final image = await _imagePicker.pickImage(
           source: ImageSource.camera,
           imageQuality: 80,
@@ -247,7 +269,6 @@ class _AddPostScreenState extends State<AddPostScreen> {
           await _addSelectedImages([image]);
           takingPhoto = false;
         } else if (decision == 'retake') {
-          // Open the camera again.
           takingPhoto = true;
         } else {
           takingPhoto = false;
@@ -260,11 +281,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isSelectingImage = false);
+        setState(() {
+          _isSelectingImage = false;
+        });
       }
     }
   }
 
+  // Remove one selected photo.
   void _removeImage(int index) {
     if (_busy) return;
 
@@ -277,52 +301,57 @@ class _AddPostScreenState extends State<AddPostScreen> {
     });
   }
 
-  // Open a selected picture larger for inspection.
+  // Open a larger photo preview.
   Future<void> _openPhotoPreview(XFile image) async {
     try {
       final bytes = await image.readAsBytes();
+
       if (!mounted) return;
 
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) => Dialog(
-          backgroundColor: Colors.black,
-          insetPadding: const EdgeInsets.all(12),
-          child: Stack(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: MediaQuery.sizeOf(dialogContext).height * 0.75,
-                child: InteractiveViewer(
-                  minScale: 1,
-                  maxScale: 5,
-                  child: Center(
-                    child: Image.memory(bytes, fit: BoxFit.contain),
+        builder: (dialogContext) {
+          return Dialog(
+            backgroundColor: Colors.black,
+            insetPadding: const EdgeInsets.all(12),
+            child: Stack(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: MediaQuery.sizeOf(dialogContext).height * 0.75,
+                  child: InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 5,
+                    child: Center(
+                      child: Image.memory(bytes, fit: BoxFit.contain),
+                    ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black54,
-                    foregroundColor: Colors.white,
+
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black54,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close),
                   ),
-                  onPressed: () => Navigator.pop(dialogContext),
-                  icon: const Icon(Icons.close),
                 ),
-              ),
-            ],
-          ),
-        ),
+              ],
+            ),
+          );
+        },
       );
     } catch (e) {
       _showMessage('Could not open picture: $e');
     }
   }
 
-  // Upload photos to Cloudinary and save the post.
+  // Upload all pictures to Cloudinary,
+  // then save the Community post to Firebase.
   Future<void> _createPost() async {
     if (_busy) return;
 
@@ -351,7 +380,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
       return;
     }
 
-    setState(() => _isPosting = true);
+    setState(() {
+      _isPosting = true;
+    });
 
     try {
       final imageUrls = <String>[];
@@ -382,17 +413,20 @@ class _AddPostScreenState extends State<AddPostScreen> {
       if (!mounted) return;
 
       _showMessage('Post created successfully!');
+
       Navigator.pop(context);
     } catch (e) {
       _showMessage('Unable to create post: $e');
     } finally {
       if (mounted) {
-        setState(() => _isPosting = false);
+        setState(() {
+          _isPosting = false;
+        });
       }
     }
   }
 
-  // Preview one selected photo.
+  // One small preview card for a selected photo.
   Widget _selectedPhotoCard(int index) {
     final image = _selectedImages[index];
 
@@ -402,9 +436,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
       margin: const EdgeInsets.only(right: 10),
       padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
-        color: _pale,
+        color: _soft,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _mint),
+        border: Border.all(color: _border),
       ),
       child: Column(
         children: [
@@ -417,14 +451,17 @@ class _AddPostScreenState extends State<AddPostScreen> {
                   future: image.readAsBytes(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return const Center(
-                        child: Icon(Icons.broken_image_outlined, color: _sage),
+                      return Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: _accent,
+                        ),
                       );
                     }
 
                     if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: _forest),
+                      return Center(
+                        child: CircularProgressIndicator(color: _accent),
                       );
                     }
 
@@ -438,11 +475,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 5),
+
           Text(
             'Photo ${index + 1}',
-            style: const TextStyle(color: _forest, fontWeight: FontWeight.bold),
+            style: TextStyle(color: _text, fontWeight: FontWeight.bold),
           ),
+
           TextButton.icon(
             onPressed: _busy ? null : () => _removeImage(index),
             icon: const Icon(Icons.close, size: 16),
@@ -453,30 +493,35 @@ class _AddPostScreenState extends State<AddPostScreen> {
     );
   }
 
-  // Photo previews.
+  // Show selected photos or an empty placeholder.
   Widget _imagePreview() {
     if (_selectedImages.isEmpty) {
       return Container(
         height: 170,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: _pale,
-          border: Border.all(color: _sage),
+          color: _soft,
+          border: Border.all(color: _border),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Column(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add_photo_alternate_outlined, color: _forest, size: 48),
-            SizedBox(height: 10),
+            Icon(Icons.add_photo_alternate_outlined, color: _accent, size: 48),
+
+            const SizedBox(height: 10),
+
             Text(
               'Add up to 5 pictures',
-              style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
+              style: TextStyle(color: _text, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 4),
+
+            const SizedBox(height: 4),
+
             Text(
               'Take a photo or select from your gallery.',
               textAlign: TextAlign.center,
+              style: TextStyle(color: _secondary),
             ),
           ],
         ),
@@ -488,9 +533,11 @@ class _AddPostScreenState extends State<AddPostScreen> {
       children: [
         Text(
           '${_selectedImages.length} of 5 photos selected',
-          style: const TextStyle(color: _forest, fontWeight: FontWeight.bold),
+          style: TextStyle(color: _text, fontWeight: FontWeight.bold),
         ),
+
         const SizedBox(height: 10),
+
         SizedBox(
           height: 215,
           child: ListView.builder(
@@ -499,90 +546,104 @@ class _AddPostScreenState extends State<AddPostScreen> {
             itemBuilder: (context, index) => _selectedPhotoCard(index),
           ),
         ),
+
         const SizedBox(height: 5),
-        const Text(
+
+        Text(
           'Tap a photo to enlarge it. Swipe to see more.',
-          style: TextStyle(fontSize: 12, color: _ink),
+          style: TextStyle(fontSize: 12, color: _secondary),
         ),
       ],
     );
   }
 
-  // Optional tips; nothing is automatically rejected.
+  // Optional photo tips.
   Widget _photoTips() {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _pale,
+        color: _soft,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _mint),
+        border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.lightbulb_outline, color: _forest),
+              Icon(Icons.lightbulb_outline, color: _accent),
+
               const SizedBox(width: 8),
-              const Expanded(
+
+              Expanded(
                 child: Text(
                   'Optional Photo Tips',
-                  style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: _text, fontWeight: FontWeight.bold),
                 ),
               ),
+
               IconButton(
                 tooltip: 'Hide photo tips',
                 onPressed: () {
-                  setState(() => _showPhotoTips = false);
+                  setState(() {
+                    _showPhotoTips = false;
+                  });
                 },
-                icon: const Icon(Icons.close, size: 19),
+                icon: Icon(Icons.close, color: _text, size: 19),
               ),
             ],
           ),
-          const Text(
+
+          Text(
             '• Try moving closer to a window for more light.\n'
             '• Hold the camera steady for a clearer picture.\n'
             '• Tap the screen to focus if your camera supports it.\n'
             '• You can post any picture you like, even '
             'if the lighting is not perfect.',
-            style: TextStyle(color: _ink, height: 1.5),
+            style: TextStyle(color: _secondary, height: 1.5),
           ),
         ],
       ),
     );
   }
 
+  // Main Community Photos section.
   Widget _photoSection() {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _card,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _mint),
+        border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.camera_alt_outlined, color: _forest),
-              SizedBox(width: 8),
+              Icon(Icons.camera_alt_outlined, color: _accent),
+
+              const SizedBox(width: 8),
+
               Text(
                 'Community Photos',
                 style: TextStyle(
-                  color: _forest,
+                  color: _text,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
+
           const SizedBox(height: 6),
-          const Text(
+
+          Text(
             'Share your plants, your garden, or anything '
             'you want to show the Community.',
-            style: TextStyle(color: _ink),
+            style: TextStyle(color: _secondary),
           ),
+
           const SizedBox(height: 16),
 
           if (_showPhotoTips) ...[
@@ -591,7 +652,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
           ] else ...[
             TextButton.icon(
               onPressed: () {
-                setState(() => _showPhotoTips = true);
+                setState(() {
+                  _showPhotoTips = true;
+                });
               },
               icon: const Icon(Icons.lightbulb_outline),
               label: const Text('Show Photo Tips'),
@@ -599,12 +662,14 @@ class _AddPostScreenState extends State<AddPostScreen> {
           ],
 
           _imagePreview(),
+
           const SizedBox(height: 12),
 
-          const Text(
+          Text(
             'Up to 5 pictures, 10 MB each. Photos are optional.',
-            style: TextStyle(fontSize: 12, color: _ink),
+            style: TextStyle(fontSize: 12, color: _secondary),
           ),
+
           const SizedBox(height: 14),
 
           Row(
@@ -616,7 +681,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
                   label: const Text('Gallery'),
                 ),
               ),
+
               const SizedBox(width: 12),
+
               Expanded(
                 child: FilledButton.icon(
                   onPressed: _busy ? null : _takePhoto,
@@ -633,17 +700,19 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
           if (kIsWeb) ...[
             const SizedBox(height: 10),
-            const Text(
+
+            Text(
               'On Chrome, the Camera button may open a '
               'file picker depending on browser support.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: _ink),
+              style: TextStyle(fontSize: 12, color: _secondary),
             ),
           ],
 
           if (_isSelectingImage) ...[
             const SizedBox(height: 12),
-            const Center(child: CircularProgressIndicator(color: _forest)),
+
+            Center(child: CircularProgressIndicator(color: _accent)),
           ],
         ],
       ),
@@ -652,33 +721,49 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final baseTheme = Theme.of(context);
+    final isDark = PlantPalColors.isDark(context);
+
     return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(seedColor: _forest),
+      // Keep the active brightness. Do not force light mode.
+      data: baseTheme.copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _forest,
+          brightness: baseTheme.brightness,
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: _accent),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(foregroundColor: _accent),
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white,
-          labelStyle: const TextStyle(color: _forest),
+          fillColor: isDark ? const Color(0xFF304237) : Colors.white,
+          labelStyle: TextStyle(color: _secondary),
+          hintStyle: TextStyle(color: _secondary),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _mint),
+            borderSide: BorderSide(color: _border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: _forest, width: 2),
+            borderSide: BorderSide(color: _accent, width: 2),
           ),
         ),
       ),
       child: Scaffold(
-        backgroundColor: _pale,
+        backgroundColor: _background,
         appBar: AppBar(
-          title: const Text(
+          title: Text(
             'Create Post',
-            style: TextStyle(color: _forest, fontWeight: FontWeight.bold),
+            style: TextStyle(color: _text, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
-          backgroundColor: _pale,
+          backgroundColor: _background,
+          foregroundColor: _text,
+          surfaceTintColor: Colors.transparent,
         ),
         body: Center(
           child: ConstrainedBox(
@@ -688,16 +773,19 @@ class _AddPostScreenState extends State<AddPostScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Welcome banner.
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: _mint,
+                      color: _soft,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.spa_outlined, color: _forest, size: 30),
-                        SizedBox(width: 12),
+                        Icon(Icons.spa_outlined, color: _accent, size: 30),
+
+                        const SizedBox(width: 12),
+
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,16 +793,18 @@ class _AddPostScreenState extends State<AddPostScreen> {
                               Text(
                                 'Share with PlantPal!',
                                 style: TextStyle(
-                                  color: _forest,
+                                  color: _text,
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(height: 6),
+
+                              const SizedBox(height: 6),
+
                               Text(
                                 'Share a picture, a growing tip, '
                                 'or a question with the Community.',
-                                style: TextStyle(color: _ink),
+                                style: TextStyle(color: _secondary),
                               ),
                             ],
                           ),
@@ -725,41 +815,50 @@ class _AddPostScreenState extends State<AddPostScreen> {
 
                   const SizedBox(height: 18),
 
+                  // Post title and description.
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _card,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _mint),
+                      border: Border.all(color: _border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Post Details',
                           style: TextStyle(
-                            color: _forest,
+                            color: _text,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+
                         const SizedBox(height: 14),
+
                         TextField(
                           controller: _titleController,
                           enabled: !_isPosting,
                           maxLength: 100,
                           textCapitalization: TextCapitalization.sentences,
+                          style: TextStyle(color: _text),
+                          cursorColor: _accent,
                           decoration: const InputDecoration(
                             labelText: 'Post Title',
                             hintText: 'What would you like to share?',
                           ),
                         ),
+
                         const SizedBox(height: 12),
+
                         TextField(
                           controller: _descriptionController,
                           enabled: !_isPosting,
                           maxLength: 1000,
                           maxLines: 5,
+                          style: TextStyle(color: _text),
+                          cursorColor: _accent,
                           decoration: const InputDecoration(
                             labelText: 'Description',
                             hintText: 'Tell the Community about your post...',
@@ -771,22 +870,27 @@ class _AddPostScreenState extends State<AddPostScreen> {
                   ),
 
                   const SizedBox(height: 18),
+
+                  // Photos and camera.
                   _photoSection(),
+
                   const SizedBox(height: 20),
 
                   if (_isPosting) ...[
-                    const Center(
-                      child: CircularProgressIndicator(color: _forest),
-                    ),
+                    Center(child: CircularProgressIndicator(color: _accent)),
+
                     const SizedBox(height: 10),
-                    const Text(
+
+                    Text(
                       'Uploading photos and sharing your post...',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: _forest),
+                      style: TextStyle(color: _text),
                     ),
+
                     const SizedBox(height: 12),
                   ],
 
+                  // Submit Community post.
                   FilledButton.icon(
                     onPressed: _busy ? null : _createPost,
                     style: FilledButton.styleFrom(
@@ -800,7 +904,9 @@ class _AddPostScreenState extends State<AddPostScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
+
                   const SizedBox(height: 10),
+
                   OutlinedButton(
                     onPressed: _busy ? null : () => Navigator.pop(context),
                     child: const Text('Cancel'),

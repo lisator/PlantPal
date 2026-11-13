@@ -86,13 +86,15 @@ class PerenualService {
     final cached = _searchCache[cacheKey];
     if (cached != null) return cached;
 
-    final json = await _getCached(Uri.parse('$_baseUrl/species-list').replace(
-      queryParameters: {
-        'q': normalized,
-        'page': '$page',
-        if (indoorOnly) 'indoor': '1',
-      },
-    ));
+    final json = await _getCached(
+      Uri.parse('$_baseUrl/species-list').replace(
+        queryParameters: {
+          'q': normalized,
+          'page': '$page',
+          if (indoorOnly) 'indoor': '1',
+        },
+      ),
+    );
 
     final result = PlantSearchPage.fromJson(json);
     _searchCache[cacheKey] = result;
@@ -111,8 +113,7 @@ class PerenualService {
     final query = species.isNotEmpty ? species : commonName.trim();
     if (query.isEmpty) return null;
 
-    final results =
-        (await searchPlants(query, indoorOnly: false)).results;
+    final results = (await searchPlants(query, indoorOnly: false)).results;
     if (results.isEmpty) return null;
 
     final wanted = species.toLowerCase();
@@ -133,8 +134,8 @@ class PerenualService {
     // requested at the same time as the details instead of after them.
     final careGuide = _getCareGuide(id);
     final json = await _getCached(Uri.parse('$_baseUrl/species/details/$id'));
-    final details =
-        PlantDetails.fromJson(json).copyWith(careGuide: await careGuide);
+    final details = PlantDetails.fromJson(json)
+        .copyWith(careGuide: await careGuide);
 
     _detailsCache[id] = details;
     return details;
@@ -144,10 +145,12 @@ class PerenualService {
   /// nice-to-have, so if it fails the details still show without it.
   Future<Map<String, String>> _getCareGuide(int id) async {
     try {
-      final json = await _getCached(Uri.parse(
-        'https://perenual.com/api/species-care-guide-list'
-        '?species_id=$id&page=1',
-      ));
+      final json = await _getCached(
+        Uri.parse(
+          'https://perenual.com/api/species-care-guide-list'
+          '?species_id=$id&page=1',
+        ),
+      );
       return parseCareGuide(json);
     } catch (e) {
       debugPrint('Perenual care guide for $id failed: $e');
@@ -166,7 +169,9 @@ class PerenualService {
       final saved = prefs.getString(cacheKey);
       if (saved != null) {
         final entry = jsonDecode(saved) as Map<String, dynamic>;
-        final savedAt = DateTime.fromMillisecondsSinceEpoch(entry['savedAt'] as int);
+        final savedAt = DateTime.fromMillisecondsSinceEpoch(
+          entry['savedAt'] as int,
+        );
         if (DateTime.now().difference(savedAt) < _cacheDuration) {
           return entry['body'] as Map<String, dynamic>;
         }
@@ -179,7 +184,10 @@ class PerenualService {
     try {
       await prefs?.setString(
         cacheKey,
-        jsonEncode({'savedAt': DateTime.now().millisecondsSinceEpoch, 'body': body}),
+        jsonEncode({
+          'savedAt': DateTime.now().millisecondsSinceEpoch,
+          'body': body,
+        }),
       );
     } catch (e) {
       debugPrint('Perenual cache write failed: $e');
@@ -262,10 +270,14 @@ class PerenualService {
 
     final body = jsonDecode(response.body);
     if (body is! Map<String, dynamic>) {
-      throw const PerenualException('Unexpected response from the plant database.');
+      throw const PerenualException(
+        'Unexpected response from the plant database.',
+      );
     }
     // Perenual reports some errors (bad key, rate limit) as 200 + "message".
-    if (body.containsKey('message') && !body.containsKey('data') && !body.containsKey('id')) {
+    if (body.containsKey('message') &&
+        !body.containsKey('data') &&
+        !body.containsKey('id')) {
       final message = body['message'].toString();
       if (message.toLowerCase().contains('rate limit')) {
         throw const PerenualException(
