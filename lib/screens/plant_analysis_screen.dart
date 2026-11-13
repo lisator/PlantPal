@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/plant_api_service.dart';
 
@@ -10,6 +11,7 @@ import '../services/cloudinary_service.dart';
 import '../services/database_service.dart';
 import 'home_screen.dart';
 import 'plant_camera_screen.dart';
+import 'my_plants_screen.dart';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -24,6 +26,14 @@ class _UploadScreenState extends State<UploadScreen> {
 
   static const int _maxImages = 5;
 
+  late Future<List<_RecentAnalysisItem>> _recentAnalyses;
+
+  @override
+  void initState() {
+    super.initState();
+    _recentAnalyses = _loadRecentAnalyses();
+  }
+
   //String? _fileName;
   bool _isAnalyzing = false;
 
@@ -37,6 +47,57 @@ class _UploadScreenState extends State<UploadScreen> {
 
   List<Map<String, dynamic>> _healthIssues = [];
   List<String> _recommendedCare = [];
+
+  Future<List<_RecentAnalysisItem>> _loadRecentAnalyses() async {
+      final userId = currentUserId();
+
+      if (userId == null) {
+        return [];
+      }
+
+      final plants =
+          await DatabaseService().getMyPlants(userId).first;
+
+      final recentAnalyses = <_RecentAnalysisItem>[];
+
+      for (final plant in plants) {
+        final snapshot =
+            await DatabaseService().getPlantAnalyses(
+          userId: userId,
+          plantId: plant.id,
+        ).first;
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+
+          final timestamp =
+              data['analyzedAt'] as Timestamp?;
+
+          recentAnalyses.add(
+            _RecentAnalysisItem(
+              plant: plant,
+              plantName: plant.displayName,
+              imageUrl: data['imageUrl'] as String?,
+              healthStatus:
+                  data['healthStatus']?.toString() ?? 'Unknown',
+              analyzedAt: timestamp?.toDate(),
+            ),
+          );
+        }
+      }
+
+      recentAnalyses.sort((a, b) {
+        final aDate =
+            a.analyzedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        final bDate =
+            b.analyzedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+        return bDate.compareTo(aDate);
+      });
+
+      return recentAnalyses.take(3).toList();
+    }
 
   Future<void> _pickImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
@@ -392,9 +453,12 @@ class _UploadScreenState extends State<UploadScreen> {
         SnackBar(content: Text('${plant.displayName} was added to My Plants.')),
       );
 
-      _resetAnalysis();
-    } catch (e) {
-      debugPrint('Save plant error: $e');
+    _resetAnalysis();
+        setState(() {
+      _recentAnalyses = _loadRecentAnalyses();
+    });
+  } catch (e) {
+    debugPrint('Save plant error: $e');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -520,23 +584,213 @@ class _UploadScreenState extends State<UploadScreen> {
         ),
       );
 
-      _resetAnalysis();
-    } catch (e) {
-      debugPrint('Save existing plant analysis error: $e');
+    _resetAnalysis();
+    setState(() {
+      _recentAnalyses = _loadRecentAnalyses();
+    });
+    
+  } catch (e) {
+    debugPrint(
+      'Save existing plant analysis error: $e',
+    );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save analysis. Try again.')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Could not save analysis. Try again.',
+          ),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
     }
   }
+}
+
+  Widget _buildRecentAnalyses() {
+  return FutureBuilder<List<_RecentAnalysisItem>>(
+    future: _recentAnalyses,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      final analyses = snapshot.data ?? [];
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Recent Analyses',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F4D2E),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Your latest saved plant health checks.',
+            style: TextStyle(
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          if (analyses.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F7EC),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.eco_outlined,
+                    size: 36,
+                    color: Color(0xFF4F7C56),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'No saved analyses yet.',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Analyze a plant to start tracking its health.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...analyses.map(
+              (analysis) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    openMyPlantDetails(
+                      context,
+                      analysis.plant,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: analysis.imageUrl != null
+                              ? Image.network(
+                                  analysis.imageUrl!,
+                                  width: 62,
+                                  height: 62,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) =>
+                                          _recentImagePlaceholder(),
+                                )
+                              : _recentImagePlaceholder(),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                analysis.plantName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                analysis.healthStatus,
+                                style: TextStyle(
+                                  color:
+                                      analysis.healthStatus == 'Healthy'
+                                          ? const Color(0xFF3B7D44)
+                                          : Colors.orange.shade800,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (analysis.analyzedAt != null) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  _formatRecentDate(
+                                    analysis.analyzedAt!,
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Colors.black38,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+Widget _recentImagePlaceholder() {
+  return Container(
+    width: 62,
+    height: 62,
+    color: const Color(0xFFE4F3DF),
+    alignment: Alignment.center,
+    child: const Icon(
+      Icons.local_florist,
+      color: Color(0xFF4F7C56),
+      size: 30,
+    ),
+  );
+}
+
+String _formatRecentDate(DateTime date) {
+  return '${date.month}/${date.day}/${date.year}';
+}
 
   @override
   Widget build(BuildContext context) {
@@ -600,6 +854,12 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
             ],
           ),
+
+          if (_imageBytesList.isEmpty) ...[
+              const SizedBox(height: 28),
+
+              _buildRecentAnalyses(),
+            ],
 
           // ------------------------------------------------------------
           // SELECTED IMAGE
@@ -1108,4 +1368,20 @@ class _UploadScreenState extends State<UploadScreen> {
       ],
     );
   }
+}
+
+class _RecentAnalysisItem {
+  const _RecentAnalysisItem({
+    required this.plant,
+    required this.plantName,
+    required this.imageUrl,
+    required this.healthStatus,
+    required this.analyzedAt,
+  });
+
+  final MyPlant plant;
+  final String plantName;
+  final String? imageUrl;
+  final String healthStatus;
+  final DateTime? analyzedAt;
 }
