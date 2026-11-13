@@ -16,6 +16,50 @@ String wateringStatus(MyPlant plant) {
   return 'Water in $days days';
 }
 
+// Watering status colors: blue is on track, yellow is due today or
+// tomorrow, red is overdue.
+const Color wateringBlue = Color(0xFF2F6FB5);
+const Color wateringYellow = Color(0xFFC99A06);
+const Color wateringRed = Color(0xFFC0392B);
+
+/// Status color for a plant [daysUntilWatering] days from its next watering,
+/// or null when it has no schedule.
+Color? wateringColor(int? daysUntilWatering) {
+  final days = daysUntilWatering;
+  if (days == null) return null;
+  if (days < 0) return wateringRed;
+  if (days <= 1) return wateringYellow;
+  return wateringBlue;
+}
+
+/// Legend explaining the watering colors on plant cards.
+class WateringColorGuide extends StatelessWidget {
+  const WateringColorGuide({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    Widget item(Color color, String label) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.water_drop, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(label, style: textTheme.bodySmall),
+          ],
+        );
+
+    return Wrap(
+      spacing: 16,
+      runSpacing: 4,
+      children: [
+        item(wateringYellow, 'Due today or tomorrow'),
+        item(wateringRed, 'Overdue'),
+      ],
+    );
+  }
+}
+
 /// Marks [plant] watered now, with an Undo in case it was a mis-tap.
 Future<void> markPlantWatered(
   BuildContext context, {
@@ -235,6 +279,9 @@ class WateringRemindersCard extends StatelessWidget {
           child: ReminderCard(
             message:
                 '${wateringStatus(plant)}: ${plant.displayName}'
+            icon: Icons.water_drop,
+            iconColor: wateringColor(plant.daysUntilWatering()),
+            message: '${wateringStatus(plant)}: ${plant.displayName}'
                 '${plant.nickname != null ? ' (${plant.commonName})' : ''}',
             onChanged: (checked) {
               if (checked == true) {
@@ -246,10 +293,22 @@ class WateringRemindersCard extends StatelessWidget {
       if (upcoming.isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            'Next: ${upcoming.first.displayName} - '
-            '${wateringStatus(upcoming.first).replaceFirst('Water ', '')}',
-            style: textTheme.bodyMedium,
+          child: Row(
+            children: [
+              Icon(
+                Icons.water_drop,
+                size: 16,
+                color: wateringColor(upcoming.first.daysUntilWatering()),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Next: ${upcoming.first.displayName} - '
+                  '${wateringStatus(upcoming.first).replaceFirst('Water ', '')}',
+                  style: textTheme.bodyMedium,
+                ),
+              ),
+            ],
           ),
         ),
       for (final plant in unscheduled)
@@ -268,6 +327,10 @@ class WateringRemindersCard extends StatelessWidget {
             ),
           ],
         ),
+      if (scheduled.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        const WateringColorGuide(),
+      ],
     ];
 
     return Column(
