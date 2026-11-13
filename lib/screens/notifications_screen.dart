@@ -38,7 +38,6 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  static const Color _forest = Color(0xFF315F43);
 
   final NotificationService _notifications = NotificationService();
 
