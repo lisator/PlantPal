@@ -77,6 +77,8 @@ Rules:
         // No time limit: a slow answer is better than no care info.
         final response = await _model(name)
             .generateContent([Content.text(text)]);
+        final response =
+            await _model(name).generateContent([Content.text(text)]);
         final json = jsonDecode(response.text ?? '');
         return json is Map ? verifiedExcerpts(json, text) : null;
       } catch (e) {
