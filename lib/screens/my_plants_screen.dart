@@ -234,6 +234,10 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                                         ),
                                       ),
                                 ),
+
+                                const SizedBox(height: 8),
+
+                                const WateringColorGuide(),
                               ],
                             );
                           }
@@ -478,7 +482,9 @@ class MyPlantCard extends StatelessWidget {
   }
 }
 
-// Watering badge displayed on each plant card.
+/// Pill showing when a plant needs water. Always dark text on a light pill
+/// (white text this small looks blurry on web), tinted with the watering
+/// color (blue, yellow, red); pale when there's no schedule.
 class _WateringBadge extends StatelessWidget {
   const _WateringBadge({required this.text, required this.daysUntilWatering});
 
@@ -490,14 +496,15 @@ class _WateringBadge extends StatelessWidget {
     final days = daysUntilWatering;
 
     final due = days != null && days <= 0;
+    final color = wateringColor(days);
 
-    final background = PlantPalColors.softBackground(context);
+    final background = color == null
+        ? PlantPalColors.softBackground(context)
+        : color.withValues(alpha: 0.12);
 
     final foreground = PlantPalColors.text(context);
 
-    final borderColor = due
-        ? PlantPalColors.accent(context)
-        : PlantPalColors.border(context);
+    final borderColor = color ?? PlantPalColors.border(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -512,7 +519,7 @@ class _WateringBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.water_drop, size: 14, color: foreground),
+          Icon(Icons.water_drop, size: 14, color: color ?? foreground),
 
           const SizedBox(width: 4),
 
