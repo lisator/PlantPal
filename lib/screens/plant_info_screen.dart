@@ -90,7 +90,6 @@ class _PlantSearchState extends State<PlantSearch> {
     }
   }
 
-  // Search using the Perenual API.
   Future<void> _loadRecentSearches() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -353,7 +352,7 @@ class _PlantSearchState extends State<PlantSearch> {
                       .textTheme
                       .titleSmall
                       ?.copyWith(
-                        color: _ink,
+                        color: _text,
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -370,14 +369,14 @@ class _PlantSearchState extends State<PlantSearch> {
             children: [
               for (final recent in _recentSearches)
                 InputChip(
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: _mint),
+                  backgroundColor: _card,
+                  side: BorderSide(color: _border),
                   shape: const StadiumBorder(),
-                  labelStyle: const TextStyle(color: _forest),
-                  avatar: const Icon(Icons.history, size: 18, color: _forest),
+                  labelStyle: TextStyle(color: _accent),
+                  avatar: Icon(Icons.history, size: 18, color: _accent),
                   label: Text(recent),
                   deleteIcon: const Icon(Icons.close, size: 16),
-                  deleteIconColor: _forest,
+                  deleteIconColor: _accent,
                   deleteButtonTooltipMessage: 'Remove from recent',
                   onPressed: () => _useSuggestion(recent),
                   onDeleted: () => _removeRecentSearch(recent),

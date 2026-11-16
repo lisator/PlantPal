@@ -128,8 +128,6 @@ class ReminderCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            const Icon(Icons.local_florist),
-            const SizedBox(width: 12),
             Icon(
               icon,
               color: iconColor,

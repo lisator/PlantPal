@@ -277,8 +277,6 @@ class WateringRemindersCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: ReminderCard(
-            message:
-                '${wateringStatus(plant)}: ${plant.displayName}'
             icon: Icons.water_drop,
             iconColor: wateringColor(plant.daysUntilWatering()),
             message: '${wateringStatus(plant)}: ${plant.displayName}'

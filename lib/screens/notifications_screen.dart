@@ -11,6 +11,7 @@ import '../services/plant_reminder_service.dart';
 import 'home_screen.dart';
 import 'my_plants_screen.dart';
 import 'user_profile_screen.dart';
+import '../widgets/watering.dart';
 
 // Extra information displayed inside activity notifications.
 class _ActivityDetails {
@@ -37,7 +38,6 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  static const Color _forest = Color(0xFF315F43);
 
   final NotificationService _notifications = NotificationService();
 
@@ -461,9 +461,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 backgroundColor: _softColor,
                 child: Icon(
                   reminder.type == 'watering'
-                      ? Icons.water_drop_outlined
+                      ? Icons.water_drop
                       : Icons.camera_alt_outlined,
-                  color: _primaryColor,
+                  color: reminder.type == 'watering'
+                      ? wateringColor(reminder.plant.daysUntilWatering()) ??
+                            _primaryColor
+                      : _primaryColor,
                 ),
               ),
         title: Text(
@@ -665,54 +668,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           fontWeight: FontWeight.bold,
         ),
       ),
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...duePlants.map((plant) {
-              return Card(
-                color: _mint,
-                elevation: 0,
-                margin: const EdgeInsets.only(bottom: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.water_drop,
-                      color: wateringColor(plant.daysUntilWatering()),
-                    ),
-                  ),
-                  title: Text(
-                    plant.displayName,
-                    style: const TextStyle(
-                      color: _forest,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    wateringStatus(plant),
-                    style: const TextStyle(color: _ink),
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                    color: _forest,
-                  ),
-                  onTap: () {
-                    HomeTabs.goTo(
-                      context,
-                      HomeTabs.myPlants,
-                    );
-                  },
-                ),
-              );
-            }),
-            const SizedBox(height: 2),
-            const WateringColorGuide(),
-          ],
-        );
-      },
     );
   }
 
@@ -812,6 +767,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           if (watering.isEmpty) const Text('No watering reminders are due.'),
 
           ...watering.map((reminder) => _reminderCard(userId, reminder)),
+
+          if (watering.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            const WateringColorGuide(),
+          ],
         ],
 
         // PLANT PROGRESS REMINDERS
