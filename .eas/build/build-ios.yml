@@ -3,9 +3,12 @@ build:
   steps:
     - eas/checkout
     - run:
-        name: Build iOS IPA
+        name: Install Flutter and Build iOS IPA
         command: |
-          unset FLUTTER_BUILD_NAME
+	  git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$HOME/flutter"
+          export PATH="$HOME/flutter/bin:$PATH"
+	  unset FLUTTER_BUILD_NAME
           unset FLUTTER_BUILD_NUMBER
+	  flutter precache --ios
           flutter pub get
-          flutter build ipa --release
+          flutter build ipa --release --no-codesign
