@@ -1,0 +1,11 @@
+build:
+  name: Build Flutter iOS App
+  steps:
+    - eas/checkout
+    - run:
+        name: Build iOS IPA
+        command: |
+          unset FLUTTER_BUILD_NAME
+          unset FLUTTER_BUILD_NUMBER
+          flutter pub get
+          flutter build ipa --release
