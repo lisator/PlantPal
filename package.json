@@ -1,0 +1,26 @@
+{
+  "name": "plantpal",
+  "version": "1.0.0",
+  "description": "This is an CS senior project for an app designed to help users analyze plants through image analysis/AI to help them identify care methods and needs for plants as well as utilizing resources amongst other plant enthusiasts. This app also includes a community feauture for the users to have more support for their plants!",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lisator/PlantPal.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lisator/PlantPal/issues"
+  },
+  "homepage": "https://github.com/lisator/PlantPal#readme"
+}
