@@ -6,6 +6,9 @@ import '../services/perenual_service.dart';
 import '../widgets/plant_care_guide.dart';
 import 'home_screen.dart';
 import '../widgets/health_history.dart';
+import '../services/database_service.dart';
+import '../widgets/plant_photo_editor.dart';
+import 'plant_analysis_screen.dart';
 
 // PlantPal colors, same palette as the community screen. Used for the app
 // bar, header, plant info, and care guide; Health History keeps its own look.
@@ -61,7 +64,22 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _PlantHeader(plant: plant),
+                    
+                    StreamBuilder<List<MyPlant>>(
+                      stream: userId == null
+                          ? null
+                          : DatabaseService().getMyPlants(userId),
+                      builder: (context, snapshot) {
+                        final savedPlants = snapshot.data;
+
+                        final currentPlant = savedPlants == null
+                            ? plant
+                            : savedPlants.where((p) => p.id == plant.id).firstOrNull ?? plant;
+
+                        return _PlantHeader(plant: currentPlant);
+                      },
+                    ),
+
 
                     const SizedBox(height: 24),
 
@@ -78,8 +96,24 @@ class AnalysisPlantDetailsScreen extends StatelessWidget {
 
               if (userId == null)
                 const Text('Sign in to view plant health history.')
-              else
-                HealthHistory(userId: userId, plantId: plant.id),
+              else ...[
+                HealthHistory(
+                  userId: userId,
+                  plantId: plant.id,
+                  onRunAnalysis: () async {
+                    await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (context) => Scaffold(
+                          appBar: AppBar(
+                            title: const Text('New Health Analysis'),
+                          ),
+                          body: UploadScreen(targetPlant: plant),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -135,6 +169,18 @@ class _PlantHeader extends StatelessWidget {
             ),
             const SizedBox(height: 18),
           ],
+
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => changePlantPhoto(context, plant),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Edit Photo'),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
 
           Text(
             plant.displayName,
