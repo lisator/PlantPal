@@ -1,6 +1,5 @@
 build:
   name: Build Flutter iOS App
-  image: latest
   steps:
     - eas/checkout
     - run:

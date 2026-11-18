@@ -2,6 +2,7 @@
   "build": {
     "production": {
       "ios": {
+        "image": "latest",
         "config": "build-ios.yml"
       }
     }
