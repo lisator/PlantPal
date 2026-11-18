@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/my_plant.dart';
 import '../services/database_service.dart';
 import '../theme/plantpal_colors.dart';
 import '../widgets/watering.dart';
 import '../widgets/plant_care_guide.dart';
+import '../widgets/plant_photo_editor.dart';
 
 import 'home_screen.dart';
 import 'plant_details_screen.dart';
@@ -57,6 +59,7 @@ void openMyPlantDetails(BuildContext context, MyPlant plant) {
       plant.toSearchResult(),
       collapseCare: true,
       fromMyPlants: true,
+      savedPlant: plant,
     );
     return;
   }
@@ -348,13 +351,31 @@ class MyPlantCard extends StatelessWidget {
                   : CrossAxisAlignment.start,
 
               children: [
-                // Plant thumbnail.
-                PlantThumbnailWithFallback(
-                  url: plant.imageUrl,
-                  scientificName: plant.scientificName,
-                  commonName: plant.commonName,
-                  size: compact ? 40 : 72,
+                // Plant thumbnail and photo-edit button.
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PlantThumbnailWithFallback(
+                      url: plant.imageUrl,
+                      scientificName: plant.scientificName,
+                      commonName: plant.commonName,
+                      size: compact ? 40 : 72,
+                    ),
+
+                    if (!compact)
+                      IconButton(
+                        tooltip: 'Change plant photo',
+                        icon: const Icon(
+                          Icons.camera_alt_outlined,
+                          size: 20,
+                        ),
+                        color: accent,
+                        onPressed: () =>
+                            changePlantPhoto(context, plant),
+                      ),
+                  ],
                 ),
+
 
                 SizedBox(width: compact ? 12 : 16),
 
@@ -386,6 +407,9 @@ class MyPlantCard extends StatelessWidget {
                           ),
                         ),
 
+                      const SizedBox(height: 6),
+                      _LatestHealthStatus(plantId: plant.id),
+
                       if (!compact) ...[
                         // Plant location.
                         if (plant.location != null) ...[
@@ -413,47 +437,56 @@ class MyPlantCard extends StatelessWidget {
 
                         const SizedBox(height: 4),
 
+                                             
                         // Watering status and controls.
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                        LayoutBuilder(
+                          builder: (context, available) {
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: available.maxWidth,
+                                  ),
+                                  child: _WateringBadge(
+                                    text: wateringStatus(plant),
+                                    daysUntilWatering: daysUntilWatering,
+                                  ),
+                                ),
 
-                          children: [
-                            _WateringBadge(
-                              text: wateringStatus(plant),
-                              daysUntilWatering: daysUntilWatering,
-                            ),
+                                if (onWatered != null &&
+                                    daysUntilWatering != null)
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: accent,
+                                    ),
+                                    onPressed: onWatered,
+                                    icon: const Icon(
+                                      Icons.water_drop_outlined,
+                                      size: 18,
+                                    ),
+                                    label: const Text('Watered'),
+                                  ),
 
-                            // Watered button.
-                            if (onWatered != null && daysUntilWatering != null)
-                              TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: accent,
-                                ),
-                                onPressed: onWatered,
-                                icon: const Icon(
-                                  Icons.water_drop_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('Watered'),
-                              ),
-
-                            // Watering schedule button.
-                            if (onEditSchedule != null)
-                              TextButton(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: accent,
-                                ),
-                                onPressed: onEditSchedule,
-                                child: Text(
-                                  plant.waterEveryDays == null
-                                      ? 'Set schedule'
-                                      : 'Every ${plant.waterEveryDays} days',
-                                ),
-                              ),
-                          ],
+                                if (onEditSchedule != null)
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: accent,
+                                    ),
+                                    onPressed: onEditSchedule,
+                                    child: Text(
+                                      plant.waterEveryDays == null
+                                          ? 'Set schedule'
+                                          : 'Every ${plant.waterEveryDays} days',
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
+
                       ],
                     ],
                   ),
@@ -516,23 +549,135 @@ class _WateringBadge extends StatelessWidget {
         border: Border.all(color: borderColor, width: due ? 1.5 : 1),
       ),
 
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.water_drop, size: 14, color: color ?? foreground),
+      
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.water_drop,
+              size: 14,
+              color: color ?? foreground,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelMedium
+                    ?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
 
-          const SizedBox(width: 4),
-
-          Text(
-            text,
-            style: Theme.of(context).textTheme.labelMedium
-                ?.copyWith(color: foreground, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
     );
   }
 }
+
+
+class _LatestHealthStatus extends StatefulWidget {
+  const _LatestHealthStatus({required this.plantId});
+
+  final String plantId;
+
+  @override
+  State<_LatestHealthStatus> createState() =>
+      _LatestHealthStatusState();
+}
+
+class _LatestHealthStatusState extends State<_LatestHealthStatus> {
+  Stream<QuerySnapshot<Map<String, dynamic>>>? _analysis;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribe();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LatestHealthStatus oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.plantId != widget.plantId) {
+      _subscribe();
+    }
+  }
+
+  void _subscribe() {
+    final userId = currentUserId();
+
+    _analysis = userId == null
+        ? null
+        : DatabaseService().getLatestPlantAnalysis(
+            userId: userId,
+            plantId: widget.plantId,
+          );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _analysis,
+      builder: (context, snapshot) {
+        String label = 'Not analyzed';
+        IconData icon = Icons.help_outline;
+        Color color = PlantPalColors.secondaryText(context);
+
+        if (snapshot.hasError) {
+          label = 'Health unavailable';
+        } else if (snapshot.hasData &&
+            snapshot.data!.docs.isNotEmpty) {
+          final status =
+              (snapshot.data!.docs.first.data()['healthStatus'] ?? '')
+                  .toString()
+                  .trim();
+
+          if (status.toLowerCase() == 'healthy') {
+            label = 'Healthy';
+            icon = Icons.check_circle_outline;
+            color = const Color(0xFF3B7D44);
+          } else if (status.isNotEmpty) {
+            label = status;
+            icon = Icons.warning_amber_rounded;
+            color = Colors.orange.shade800;
+          }
+        } else if (!snapshot.hasData && _analysis != null) {
+          label = 'Checking health...';
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: color),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 
 // Displays small details such as plant location
 // and watering recommendations.

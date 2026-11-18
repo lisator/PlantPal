@@ -4,10 +4,16 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 
 class HealthHistory extends StatelessWidget {
-  const HealthHistory({super.key, required this.userId, required this.plantId});
+  const HealthHistory({
+    super.key, 
+    required this.userId, 
+    required this.plantId,
+    this.onRunAnalysis,
+  });
 
   final String userId;
   final String plantId;
+  final VoidCallback? onRunAnalysis;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +23,25 @@ class HealthHistory extends StatelessWidget {
         Text(
           'Health History',
           style: Theme.of(context).textTheme.headlineSmall,
-        ),
+          ),
+        
+          if (onRunAnalysis != null) ...[
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onRunAnalysis,
+                icon: const Icon(Icons.health_and_safety_outlined),
+                label: const Text('Run New Health Analysis'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+          ],
 
         const SizedBox(height: 6),
 
