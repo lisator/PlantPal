@@ -434,7 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         return SizedBox(
-          height: 80,
+          height: 110,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: plants.length,

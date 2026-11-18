@@ -14,7 +14,12 @@ import 'plant_camera_screen.dart';
 import 'my_plants_screen.dart';
 
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({super.key});
+  const UploadScreen({
+    super.key,
+    this.targetPlant,
+    });
+
+    final MyPlant? targetPlant;
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
@@ -476,6 +481,69 @@ class _UploadScreenState extends State<UploadScreen> {
       }
     }
   }
+
+
+Future<void> _saveToTargetPlant() async {
+  final targetPlant = widget.targetPlant;
+  final userId = currentUserId();
+
+  if (targetPlant == null || userId == null) return;
+
+  if (_scientificName == null ||
+      _healthStatus == null ||
+      _selectedImages.isEmpty ||
+      _isSaving) {
+    return;
+  }
+
+  setState(() {
+    _isSaving = true;
+  });
+
+  try {
+    // Upload the analysis picture to Cloudinary.
+    final imageUrl = await CloudinaryService().uploadImage(
+      _selectedImages.first,
+    );
+
+    // Save to the plant the user came from.
+    await DatabaseService().addPlantAnalysis(
+      userId: userId,
+      plantId: targetPlant.id,
+      scientificName: _scientificName!,
+      commonName: _commonName,
+      confidence: _confidence,
+      healthStatus: _healthStatus!,
+      issues: _healthIssues,
+      recommendedCare: _recommendedCare,
+      imageUrl: imageUrl,
+    );
+
+    if (!mounted) return;
+
+    // Return to the Plant Care page.
+    Navigator.of(context).pop(true);
+  } catch (e) {
+    debugPrint('Save target plant analysis error: $e');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Could not save analysis. Please try again.',
+        ),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+}
+
 
   Future<void> _saveToExistingPlant() async {
     final userId = currentUserId();
@@ -1283,6 +1351,24 @@ String _formatRecentDate(DateTime date) {
 
           const SizedBox(height: 16),
 
+          if (widget.targetPlant != null) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : _saveToTargetPlant,
+                icon: const Icon(Icons.save_outlined),
+                label: Text(
+                  'Save Analysis to ${widget.targetPlant!.displayName}',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF315D3A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+              ),
+            ),
+          ] else ...[
+
           // ------------------------------------------------------------
           // CREATE NEW PLANT
           // ------------------------------------------------------------
@@ -1325,6 +1411,7 @@ String _formatRecentDate(DateTime date) {
           ),
 
           const SizedBox(height: 18),
+        ],
 
           // ============================================================
           // DISCARD / ANALYZE ANOTHER

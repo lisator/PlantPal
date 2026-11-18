@@ -8,6 +8,8 @@ import '../theme/plantpal_colors.dart';
 import '../widgets/health_history.dart';
 import '../widgets/plant_care_guide.dart';
 import '../widgets/watering.dart';
+import '../widgets/plant_photo_editor.dart';
+import 'plant_analysis_screen.dart';
 
 import 'home_screen.dart';
 
@@ -51,6 +53,7 @@ void openPlantDetailsPage(
   PlantSearchResult plant, {
   bool collapseCare = false,
   bool fromMyPlants = false,
+  MyPlant? savedPlant,
 }) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
@@ -59,6 +62,7 @@ void openPlantDetailsPage(
         preview: plant,
         collapseCare: collapseCare,
         fromMyPlants: fromMyPlants,
+        savedPlant: savedPlant,
       ),
     ),
   );
@@ -71,12 +75,14 @@ class PlantDetailsScreen extends StatefulWidget {
     this.preview,
     this.collapseCare = false,
     this.fromMyPlants = false,
+    this.savedPlant,
   });
 
   final int plantId;
   final PlantSearchResult? preview;
   final bool collapseCare;
   final bool fromMyPlants;
+  final MyPlant? savedPlant;
 
   @override
   State<PlantDetailsScreen> createState() => _PlantDetailsScreenState();
@@ -150,26 +156,56 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: ListView(
                   padding: const EdgeInsets.all(20),
-                  children: [
+                  children: [                    
                     // Plant photo and basic information.
                     FutureBuilder<WikipediaExtras>(
                       future: _wikipedia,
                       builder: (context, wiki) {
-                        return _PlantHeader(
-                          name:
-                              details?.commonName ?? preview?.commonName ?? '',
-                          scientificName:
-                              details?.scientificName ??
-                              preview?.scientificName ??
-                              '',
-                          imageUrl:
-                              details?.imageUrl ??
-                              preview?.thumbnailUrl ??
-                              wiki.data?.article?.imageUrl,
-                          family: details?.family,
+                        final userId = currentUserId();
+                        final savedPlant = widget.savedPlant;
+
+                        return StreamBuilder<List<MyPlant>>(
+                          stream: savedPlant != null && userId != null
+                              ? DatabaseService().getMyPlants(userId)
+                              : null,
+                          builder: (context, savedSnapshot) {
+                            final plants = savedSnapshot.data;
+
+                            final currentPlant =
+                                savedPlant == null || plants == null
+                                ? savedPlant
+                                : plants
+                                      .where((p) => p.id == savedPlant.id)
+                                      .firstOrNull ??
+                                      savedPlant;
+
+                            return _PlantHeader(
+                              name:
+                                  details?.commonName ??
+                                  preview?.commonName ??
+                                  '',
+                              scientificName:
+                                  details?.scientificName ??
+                                  preview?.scientificName ??
+                                  '',
+                              imageUrl:
+                                  currentPlant?.imageUrl ??
+                                  details?.imageUrl ??
+                                  preview?.thumbnailUrl ??
+                                  wiki.data?.article?.imageUrl,
+                              family: details?.family,
+                              onEditPhoto: currentPlant == null
+                                  ? null
+                                  : () => changePlantPhoto(
+                                      context,
+                                      currentPlant,
+                                    ),
+                            );
+                          },
                         );
                       },
                     ),
+
 
                     const SizedBox(height: 24),
 
@@ -211,17 +247,35 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                       ),
 
                       // Existing Health History feature.
+                   
+                      // Health analysis and history for saved plants.
                       if (widget.fromMyPlants && currentUserId() != null) ...[
                         const SizedBox(height: 28),
-
-                        Theme(
-                          data: healthHistoryTheme,
-                          child: HealthHistory(
-                            userId: currentUserId()!,
-                            plantId: '${details.id}',
+                          Theme(
+                            data: healthHistoryTheme,
+                            child: HealthHistory(
+                              userId: currentUserId()!,
+                              plantId: '${details.id}',
+                              onRunAnalysis: widget.savedPlant == null
+                                  ? null
+                                  : () async {
+                                      await Navigator.of(context).push<bool>(
+                                        MaterialPageRoute(
+                                          builder: (context) => Scaffold(
+                                            appBar: AppBar(
+                                              title: const Text('New Health Analysis'),
+                                            ),
+                                            body: UploadScreen(
+                                              targetPlant: widget.savedPlant,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                            ),
                           ),
-                        ),
                       ],
+
                     ],
                   ],
                 ),
@@ -242,12 +296,14 @@ class _PlantHeader extends StatelessWidget {
     required this.scientificName,
     this.imageUrl,
     this.family,
+    this.onEditPhoto,
   });
 
   final String name;
   final String scientificName;
   final String? imageUrl;
   final String? family;
+  final VoidCallback? onEditPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +368,20 @@ class _PlantHeader extends StatelessWidget {
           if (constraints.maxWidth >= 480) {
             return Row(
               children: [
+               Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 PlantThumbnail(url: imageUrl, size: 140),
+
+                    if (onEditPhoto != null)
+                      TextButton.icon(
+                        onPressed: onEditPhoto,
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        label: const Text('Edit Photo'),
+                      ),
+                  ],
+                ),
+
                 const SizedBox(width: 20),
                 Expanded(child: info),
               ],
@@ -328,6 +397,17 @@ class _PlantHeader extends StatelessWidget {
                 size: constraints.maxWidth,
                 height: 200,
               ),
+
+              if (onEditPhoto != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onEditPhoto,
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Edit Photo'),
+                  ),
+                ),
+
               const SizedBox(height: 16),
               info,
             ],
