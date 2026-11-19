@@ -606,8 +606,7 @@ class DatabaseService {
         .set(plant.toFirestore());
   }
 
-
-  // Update a saved plant's profile picture without creating
+    // Update a saved plant's profile picture without creating
   // a new health analysis.
   Future<void> updateMyPlantPhoto({
     required String userId,
@@ -640,6 +639,22 @@ class DatabaseService {
         .collection('myPlants')
         .doc(plantId)
         .delete();
+  }
+
+    // Get only the most recent health analysis for a saved plant.
+  Stream<QuerySnapshot<Map<String, dynamic>>> getLatestPlantAnalysis({
+    required String userId,
+    required String plantId,
+  }) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc(plantId)
+        .collection('analyses')
+        .orderBy('analyzedAt', descending: true)
+        .limit(1)
+        .snapshots();
   }
 
   // Record the last watering date.
@@ -755,24 +770,6 @@ class DatabaseService {
         .orderBy('analyzedAt', descending: true)
         .snapshots();
   }
-
-
-  // Get only the most recent health analysis for a saved plant.
-  Stream<QuerySnapshot<Map<String, dynamic>>> getLatestPlantAnalysis({
-    required String userId,
-    required String plantId,
-  }) {
-    return _db
-        .collection('users')
-        .doc(userId)
-        .collection('myPlants')
-        .doc(plantId)
-        .collection('analyses')
-        .orderBy('analyzedAt', descending: true)
-        .limit(1)
-        .snapshots();
-  }
-
 
   // OTHER PLANT METHODS
 
