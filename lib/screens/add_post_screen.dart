@@ -162,6 +162,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
   }
 
   // Review a photo after taking it.
+  // Responsive layout prevents overflow on smaller screens.
   Future<String?> _reviewCapturedPhoto(XFile image) async {
     final bytes = await image.readAsBytes();
 
@@ -170,68 +171,126 @@ class _AddPostScreenState extends State<AddPostScreen> {
     return showDialog<String>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
+        final screenSize = MediaQuery.sizeOf(dialogContext);
+
+        return Dialog(
           backgroundColor: _card,
-          title: Text(
-            'How does your picture look?',
-            style: TextStyle(color: _text),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
           ),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 340),
-                  child: InteractiveViewer(
-                    maxScale: 4,
-                    child: Image.memory(
-                      bytes,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stack) {
-                        return const Text('Unable to display the preview.');
-                      },
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 420,
+              maxHeight: screenSize.height * 0.85,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'How does your picture look?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 16),
 
-                const SizedBox(height: 12),
+                  // Photo preview adapts to phone screen height.
+                  SizedBox(
+                    width: double.infinity,
+                    height: screenSize.height * 0.38,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: InteractiveViewer(
+                        minScale: 1,
+                        maxScale: 4,
+                        child: Center(
+                          child: Image.memory(
+                            bytes,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stack) {
+                              return const Text(
+                                'Unable to display the preview.',
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
 
-                Text(
-                  'You can use this picture even if '
-                  'the lighting is not perfect.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: _secondary, fontSize: 13),
-                ),
-              ],
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'You can use this picture even if '
+                    'the lighting is not perfect.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _secondary,
+                      fontSize: 13,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Buttons wrap instead of overflowing to the side.
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 10,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext, 'cancel');
+                        },
+                        child: const Text('Cancel'),
+                      ),
+
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(dialogContext, 'retake');
+                        },
+                        icon: const Icon(
+                          Icons.refresh,
+                          size: 18,
+                        ),
+                        label: const Text('Retake'),
+                      ),
+
+                      FilledButton.icon(
+                        onPressed: () {
+                          Navigator.pop(dialogContext, 'use');
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _forest,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(
+                          Icons.check,
+                          size: 18,
+                        ),
+                        label: const Text('Use Photo'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, 'cancel'),
-              child: const Text('Cancel'),
-            ),
-
-            TextButton.icon(
-              onPressed: () => Navigator.pop(dialogContext, 'retake'),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retake'),
-            ),
-
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(dialogContext, 'use'),
-              style: FilledButton.styleFrom(
-                backgroundColor: _forest,
-                foregroundColor: Colors.white,
-              ),
-              icon: const Icon(Icons.check),
-              label: const Text('Use Photo'),
-            ),
-          ],
         );
       },
     );
   }
+
 
   // Take a photo and allow retaking it.
   Future<void> _takePhoto() async {
