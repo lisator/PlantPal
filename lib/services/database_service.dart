@@ -606,6 +606,29 @@ class DatabaseService {
         .set(plant.toFirestore());
   }
 
+    // Update a saved plant's profile picture without creating
+  // a new health analysis.
+  Future<void> updateMyPlantPhoto({
+    required String userId,
+    required String plantId,
+    required String imageUrl,
+  }) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null || currentUser.uid != userId) {
+      throw StateError('You can only update your own plants.');
+    }
+
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc(plantId)
+        .update({
+          'imageUrl': imageUrl,
+        });
+  }
+
   Future<void> removeMyPlant({
     required String userId,
     required String plantId,
@@ -616,6 +639,22 @@ class DatabaseService {
         .collection('myPlants')
         .doc(plantId)
         .delete();
+  }
+
+    // Get only the most recent health analysis for a saved plant.
+  Stream<QuerySnapshot<Map<String, dynamic>>> getLatestPlantAnalysis({
+    required String userId,
+    required String plantId,
+  }) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('myPlants')
+        .doc(plantId)
+        .collection('analyses')
+        .orderBy('analyzedAt', descending: true)
+        .limit(1)
+        .snapshots();
   }
 
   // Record the last watering date.
