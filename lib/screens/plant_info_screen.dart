@@ -44,6 +44,7 @@ class _PlantSearchState extends State<PlantSearch> {
 
   String? _error;
 
+  // PlantPal theme colors for light and dark mode.
   Color get _background => PlantPalColors.background(context);
   Color get _card => PlantPalColors.card(context);
   Color get _text => PlantPalColors.text(context);
@@ -90,11 +91,14 @@ class _PlantSearchState extends State<PlantSearch> {
     }
   }
 
+  // Load previous searches saved on this device.
   Future<void> _loadRecentSearches() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getStringList(_recentSearchesKey) ?? [];
+
       if (!mounted) return;
+
       setState(() => _recentSearches = saved);
     } catch (e) {
       debugPrint('Recent searches error: $e');
@@ -104,21 +108,22 @@ class _PlantSearchState extends State<PlantSearch> {
   Future<void> _saveRecentSearches() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
       await prefs.setStringList(_recentSearchesKey, _recentSearches);
     } catch (e) {
       debugPrint('Recent searches error: $e');
     }
   }
 
-  // Moves [query] to the front, dropping any older copy (ignoring case).
+  // Move the search to the front and remove duplicates.
   void _addRecentSearch(String query) {
     setState(() {
       _recentSearches = [
         query,
-        ..._recentSearches
-            .where((s) => s.toLowerCase() != query.toLowerCase()),
+        ..._recentSearches.where((s) => s.toLowerCase() != query.toLowerCase()),
       ].take(_maxRecentSearches).toList();
     });
+
     _saveRecentSearches();
   }
 
@@ -132,7 +137,7 @@ class _PlantSearchState extends State<PlantSearch> {
     _saveRecentSearches();
   }
 
-  /// Runs a new search, replacing the current results.
+  // Search for plants using the Perenual API.
   Future<void> _search(String query) async {
     if (query == _activeQuery && _error == null && !_isLoading) {
       return;
@@ -233,7 +238,9 @@ class _PlantSearchState extends State<PlantSearch> {
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(color: _text, fontWeight: FontWeight.w700),
                     ),
+
                     const SizedBox(height: 16),
+
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _controller,
                       builder: (context, value, _) {
@@ -249,12 +256,14 @@ class _PlantSearchState extends State<PlantSearch> {
                             labelStyle: TextStyle(color: _secondary),
                             hintStyle: TextStyle(color: _secondary),
                             helperStyle: TextStyle(color: _secondary),
+
                             prefixIcon: IconButton(
                               tooltip: 'Search',
                               color: _accent,
                               icon: const Icon(Icons.search),
                               onPressed: () => _searchNow(_controller.text),
                             ),
+
                             suffixIcon: value.text.isEmpty
                                 ? null
                                 : IconButton(
@@ -263,15 +272,19 @@ class _PlantSearchState extends State<PlantSearch> {
                                     icon: const Icon(Icons.clear),
                                     onPressed: _clear,
                                   ),
+
                             filled: true,
                             fillColor: _card,
+
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(20),
                             ),
+
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(20),
                               borderSide: BorderSide(color: _border),
                             ),
+
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(20),
                               borderSide: BorderSide(color: _accent, width: 2),
@@ -285,6 +298,7 @@ class _PlantSearchState extends State<PlantSearch> {
                   ],
                 ),
               ),
+
               Expanded(child: _buildBody(context)),
             ],
           ),
@@ -298,6 +312,7 @@ class _PlantSearchState extends State<PlantSearch> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // Display an error if the search fails.
     if (_error != null) {
       return _SearchMessage(
         icon: Icons.cloud_off_outlined,
@@ -315,6 +330,7 @@ class _PlantSearchState extends State<PlantSearch> {
       );
     }
 
+    // Display suggestions and recent searches.
     if (_activeQuery.isEmpty) {
       final message = _SearchMessage(
         icon: Icons.local_florist_outlined,
@@ -338,7 +354,10 @@ class _PlantSearchState extends State<PlantSearch> {
           ],
         ),
       );
-      if (_recentSearches.isEmpty) return message;
+
+      if (_recentSearches.isEmpty) {
+        return message;
+      }
 
       return ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -348,13 +367,8 @@ class _PlantSearchState extends State<PlantSearch> {
               Expanded(
                 child: Text(
                   'Recently searched',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(
-                        color: _text,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(color: _text, fontWeight: FontWeight.w600),
                 ),
               ),
               TextButton(
@@ -363,6 +377,9 @@ class _PlantSearchState extends State<PlantSearch> {
               ),
             ],
           ),
+
+          const SizedBox(height: 8),
+
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -372,7 +389,13 @@ class _PlantSearchState extends State<PlantSearch> {
                   backgroundColor: _card,
                   side: BorderSide(color: _border),
                   shape: const StadiumBorder(),
-                  labelStyle: TextStyle(color: _accent),
+
+                  // Theme-aware text color fixes the conflict.
+                  labelStyle: TextStyle(
+                    color: _text,
+                    fontWeight: FontWeight.w500,
+                  ),
+
                   avatar: Icon(Icons.history, size: 18, color: _accent),
                   label: Text(recent),
                   deleteIcon: const Icon(Icons.close, size: 16),
@@ -383,11 +406,13 @@ class _PlantSearchState extends State<PlantSearch> {
                 ),
             ],
           ),
+
           message,
         ],
       );
     }
 
+    // No search results found.
     if (_results.isEmpty) {
       return _SearchMessage(
         icon: Icons.search_off,
@@ -398,6 +423,7 @@ class _PlantSearchState extends State<PlantSearch> {
       );
     }
 
+    // Display search results.
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       itemCount: _results.length + 2,
@@ -441,6 +467,7 @@ class _PlantSearchState extends State<PlantSearch> {
   }
 }
 
+// Card used to display a plant from search results.
 class PlantSearchResultCard extends StatelessWidget {
   const PlantSearchResultCard({super.key, required this.plant, this.onTap});
 
@@ -475,7 +502,9 @@ class PlantSearchResultCard extends StatelessWidget {
                 commonName: plant.commonName,
                 size: 56,
               ),
+
               const SizedBox(width: 14),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,6 +520,7 @@ class PlantSearchResultCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+
                     if (plant.scientificName.isNotEmpty)
                       Text(
                         plant.scientificName,
@@ -501,6 +531,7 @@ class PlantSearchResultCard extends StatelessWidget {
                           fontStyle: FontStyle.italic,
                         ),
                       ),
+
                     if (plant.otherNames.isNotEmpty)
                       Text(
                         'Also: '
@@ -509,6 +540,7 @@ class PlantSearchResultCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: secondary),
                       ),
+
                     if (!plant.hasFullDetails)
                       Container(
                         margin: const EdgeInsets.only(top: 5),
@@ -528,7 +560,9 @@ class PlantSearchResultCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               const SizedBox(width: 8),
+
               Icon(Icons.chevron_right, color: accent),
             ],
           ),
@@ -538,6 +572,7 @@ class PlantSearchResultCard extends StatelessWidget {
   }
 }
 
+// Message displayed before searching or when no results are found.
 class _SearchMessage extends StatelessWidget {
   const _SearchMessage({
     required this.icon,
@@ -560,7 +595,9 @@ class _SearchMessage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 48, color: PlantPalColors.accent(context)),
+
             const SizedBox(height: 12),
+
             Text(
               title,
               textAlign: TextAlign.center,
@@ -570,12 +607,15 @@ class _SearchMessage extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
+
             const SizedBox(height: 8),
+
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(color: PlantPalColors.secondaryText(context)),
             ),
+
             if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),

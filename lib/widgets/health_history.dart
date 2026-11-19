@@ -2,11 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/database_service.dart';
+import '../theme/plantpal_colors.dart';
 
+// Displays the saved health analyses for a plant.
 class HealthHistory extends StatelessWidget {
   const HealthHistory({
-    super.key, 
-    required this.userId, 
+    super.key,
+    required this.userId,
     required this.plantId,
     this.onRunAnalysis,
   });
@@ -17,43 +19,54 @@ class HealthHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textColor = PlantPalColors.text(context);
+    final secondaryColor = PlantPalColors.secondaryText(context);
+    final accentColor = PlantPalColors.accent(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Health History heading.
         Text(
           'Health History',
-          style: Theme.of(context).textTheme.headlineSmall,
-          ),
-        
-          if (onRunAnalysis != null) ...[
-            const SizedBox(height: 16),
+          style: Theme.of(context).textTheme.headlineSmall
+              ?.copyWith(color: textColor, fontWeight: FontWeight.bold),
+        ),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: onRunAnalysis,
-                icon: const Icon(Icons.health_and_safety_outlined),
-                label: const Text('Run New Health Analysis'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
+        // Button to start another health analysis.
+        if (onRunAnalysis != null) ...[
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onRunAnalysis,
+              icon: const Icon(Icons.health_and_safety_outlined),
+              label: const Text('Run New Health Analysis'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: PlantPalColors.forest,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
+          ),
 
-            const SizedBox(height: 16),
-          ],
+          const SizedBox(height: 16),
+        ],
 
         const SizedBox(height: 6),
 
+        // Description works in light and dark mode.
         Text(
           'Saved plant analyses appear here so you can track '
           'changes in your plant\'s health over time.',
           style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: Colors.black54),
+              ?.copyWith(color: secondaryColor),
         ),
 
         const SizedBox(height: 16),
 
+        // Retrieve saved analyses from Firebase.
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: DatabaseService().getPlantAnalyses(
             userId: userId,
@@ -67,10 +80,10 @@ class HealthHistory extends StatelessWidget {
             }
 
             if (!snapshot.hasData) {
-              return const Center(
+              return Center(
                 child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(),
+                  padding: const EdgeInsets.all(24),
+                  child: CircularProgressIndicator(color: accentColor),
                 ),
               );
             }
@@ -99,6 +112,7 @@ class HealthHistory extends StatelessWidget {
   }
 }
 
+// Individual saved analysis card.
 class _AnalysisCard extends StatelessWidget {
   const _AnalysisCard({required this.data, required this.isLatest});
 
@@ -107,6 +121,16 @@ class _AnalysisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = PlantPalColors.isDark(context);
+
+    final cardColor = PlantPalColors.card(context);
+    final textColor = PlantPalColors.text(context);
+    final secondaryColor = PlantPalColors.secondaryText(context);
+    final borderColor = PlantPalColors.border(context);
+    final accentColor = PlantPalColors.accent(context);
+    final softColor = PlantPalColors.softBackground(context);
+
+    // Read health analysis information.
     final status = data['healthStatus']?.toString() ?? 'Unknown';
 
     final confidence = (data['confidence'] as num?)?.toDouble();
@@ -134,10 +158,25 @@ class _AnalysisCard extends StatelessWidget {
         ? 'Unknown date'
         : _formatDate(timestamp.toDate());
 
+    // Health status colors for light and dark mode.
+    final statusBackground = healthy
+        ? (isDark ? const Color(0xFF294A36) : const Color(0xFFE4F3DF))
+        : (isDark ? const Color(0xFF51402A) : const Color(0xFFFFEDBC));
+
+    final statusTextColor = healthy
+        ? (isDark ? const Color(0xFFB8EBC3) : const Color(0xFF285D36))
+        : (isDark ? const Color(0xFFFFD18A) : const Color(0xFF805000));
+
+    final statusIconColor = healthy
+        ? (isDark ? const Color(0xFF9BD5AD) : const Color(0xFF3B7D44))
+        : (isDark ? const Color(0xFFFFC36B) : Colors.orange.shade800);
+
+    // Expandable analysis details.
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (imageUrl != null) ...[
+        // Saved health analysis photo.
+        if (imageUrl != null && imageUrl.isNotEmpty) ...[
           const SizedBox(height: 10),
 
           GestureDetector(
@@ -161,14 +200,19 @@ class _AnalysisCard extends StatelessWidget {
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         height: 155,
-                        color: Theme.of(context).colorScheme.primaryContainer,
+                        color: softColor,
                         alignment: Alignment.center,
-                        child: const Icon(Icons.local_florist, size: 50),
+                        child: Icon(
+                          Icons.local_florist,
+                          size: 50,
+                          color: accentColor,
+                        ),
                       );
                     },
                   ),
                 ),
 
+                // Zoom icon on the photo.
                 Positioned(
                   right: 8,
                   bottom: 8,
@@ -192,11 +236,12 @@ class _AnalysisCard extends StatelessWidget {
 
         const SizedBox(height: 12),
 
+        // Healthy or possible health issue.
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: healthy ? const Color(0xFFE4F3DF) : const Color(0xFFFFEDBC),
+            color: statusBackground,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -205,15 +250,16 @@ class _AnalysisCard extends StatelessWidget {
                 healthy
                     ? Icons.check_circle_outline
                     : Icons.warning_amber_rounded,
-                color: healthy
-                    ? const Color(0xFF3B7D44)
-                    : Colors.orange.shade800,
+                color: statusIconColor,
               ),
+
               const SizedBox(width: 10),
+
               Expanded(
                 child: Text(
                   status,
-                  style: const TextStyle(
+                  style: TextStyle(
+                    color: statusTextColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -223,20 +269,25 @@ class _AnalysisCard extends StatelessWidget {
           ),
         ),
 
+        // Identification confidence.
         if (confidence != null) ...[
           const SizedBox(height: 10),
+
           Text(
             'Identification confidence: '
             '${(confidence * 100).toStringAsFixed(1)}%',
+            style: TextStyle(color: secondaryColor),
           ),
         ],
 
+        // Detected health issues.
         if (issues.isNotEmpty) ...[
           const SizedBox(height: 14),
 
           Text(
             'Detected Issues',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(color: textColor, fontWeight: FontWeight.w600),
           ),
 
           const SizedBox(height: 8),
@@ -246,26 +297,35 @@ class _AnalysisCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 children: [
-                  const Icon(Icons.eco_outlined, size: 18),
+                  Icon(Icons.eco_outlined, size: 18, color: accentColor),
+
                   const SizedBox(width: 8),
+
                   Expanded(
-                    child: Text(issue['name']?.toString() ?? 'Unknown issue'),
+                    child: Text(
+                      issue['name']?.toString() ?? 'Unknown issue',
+                      style: TextStyle(color: textColor),
+                    ),
                   ),
+
                   if (issue['probability'] is num)
                     Text(
-                      '${(((issue['probability'] as num).toDouble()) * 100).toStringAsFixed(1)}%',
+                      '${((issue['probability'] as num).toDouble() * 100).toStringAsFixed(1)}%',
+                      style: TextStyle(color: secondaryColor),
                     ),
                 ],
               ),
             ),
         ],
 
+        // Suggested treatment.
         if (care.isNotEmpty) ...[
           const SizedBox(height: 14),
 
           Text(
             'Suggested Treatment',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(color: textColor, fontWeight: FontWeight.w600),
           ),
 
           const SizedBox(height: 8),
@@ -276,13 +336,20 @@ class _AnalysisCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.check_circle_outline,
                     size: 18,
-                    color: Color(0xFF4F7C56),
+                    color: accentColor,
                   ),
+
                   const SizedBox(width: 8),
-                  Expanded(child: Text(item)),
+
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: TextStyle(color: textColor, height: 1.4),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -290,10 +357,29 @@ class _AnalysisCard extends StatelessWidget {
       ],
     );
 
+    // Main card with expand/collapse functionality.
     return Card(
       margin: EdgeInsets.zero,
+      color: cardColor,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: borderColor),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
+        backgroundColor: cardColor,
+        collapsedBackgroundColor: cardColor,
+
+        iconColor: accentColor,
+        collapsedIconColor: secondaryColor,
+
+        textColor: textColor,
+        collapsedTextColor: textColor,
+
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
 
         title: Row(
@@ -301,21 +387,22 @@ class _AnalysisCard extends StatelessWidget {
             Expanded(
               child: Text(
                 dateText,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
               ),
             ),
 
+            // Latest analysis label.
             if (isLatest)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE4F3DF),
+                  color: softColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
+                child: Text(
                   'Latest',
                   style: TextStyle(
-                    color: Color(0xFF315D3A),
+                    color: textColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 11,
                   ),
@@ -324,11 +411,11 @@ class _AnalysisCard extends StatelessWidget {
           ],
         ),
 
-        subtitle: Text(status),
+        subtitle: Text(status, style: TextStyle(color: secondaryColor)),
 
         leading: Icon(
           healthy ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-          color: healthy ? const Color(0xFF3B7D44) : Colors.orange.shade800,
+          color: statusIconColor,
         ),
 
         children: [details],
@@ -337,6 +424,7 @@ class _AnalysisCard extends StatelessWidget {
   }
 }
 
+// Full-screen preview of a saved health analysis photo.
 class _FullScreenImage extends StatelessWidget {
   const _FullScreenImage({required this.imageUrl});
 
@@ -373,6 +461,7 @@ class _FullScreenImage extends StatelessWidget {
   }
 }
 
+// Message displayed when health history is empty or fails.
 class _MessageCard extends StatelessWidget {
   const _MessageCard({required this.message});
 
@@ -381,14 +470,24 @@ class _MessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: PlantPalColors.card(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: PlantPalColors.border(context)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Text(message, textAlign: TextAlign.center),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: TextStyle(color: PlantPalColors.secondaryText(context)),
+        ),
       ),
     );
   }
 }
 
+// Format the saved analysis date.
 String _formatDate(DateTime date) {
   const months = [
     'January',

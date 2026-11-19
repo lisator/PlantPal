@@ -7,13 +7,13 @@ import '../services/perenual_service.dart';
 import '../theme/plantpal_colors.dart';
 import '../widgets/health_history.dart';
 import '../widgets/plant_care_guide.dart';
-import '../widgets/watering.dart';
 import '../widgets/plant_photo_editor.dart';
-import 'plant_analysis_screen.dart';
+import '../widgets/watering.dart';
 
 import 'home_screen.dart';
+import 'plant_analysis_screen.dart';
 
-// Shared PlantPal theme, keeping the current brightness.
+// Shared PlantPal theme, preserving light and dark mode.
 ThemeData _screenTheme(ThemeData base) {
   final isDark = base.brightness == Brightness.dark;
   final accent = isDark ? PlantPalColors.darkAccent : PlantPalColors.forest;
@@ -47,7 +47,7 @@ ThemeData _screenTheme(ThemeData base) {
   );
 }
 
-// Opens the details page for a Perenual plant.
+// Open the details page for a Perenual plant.
 void openPlantDetailsPage(
   BuildContext context,
   PlantSearchResult plant, {
@@ -103,7 +103,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
 
     final preview = widget.preview;
 
-    // Look up Wikipedia information alongside Perenual.
+    // Load Wikipedia information alongside Perenual.
     _wikipedia = preview != null
         ? loadWikipediaFor(
             scientificName: preview.scientificName,
@@ -115,7 +115,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   Future<PlantDetails> _loadDetails() async {
     final preview = widget.preview;
 
-    // Avoid unsupported API requests for basic-only plants.
+    // Avoid unsupported API calls for basic-only plants.
     if (preview != null && !preview.hasFullDetails) {
       return PlantDetails.basic(preview);
     }
@@ -125,11 +125,10 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Keep the original theme available for Health History.
     final healthHistoryTheme = Theme.of(context);
-
     final background = PlantPalColors.background(context);
     final textColor = PlantPalColors.text(context);
+    final userId = currentUserId();
 
     return Theme(
       data: _screenTheme(Theme.of(context)),
@@ -156,12 +155,11 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: ListView(
                   padding: const EdgeInsets.all(20),
-                  children: [                    
-                    // Plant photo and basic information.
+                  children: [
+                    // Plant picture and basic information.
                     FutureBuilder<WikipediaExtras>(
                       future: _wikipedia,
                       builder: (context, wiki) {
-                        final userId = currentUserId();
                         final savedPlant = widget.savedPlant;
 
                         return StreamBuilder<List<MyPlant>>(
@@ -175,12 +173,13 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                                 savedPlant == null || plants == null
                                 ? savedPlant
                                 : plants
-                                      .where((p) => p.id == savedPlant.id)
-                                      .firstOrNull ??
+                                          .where((p) => p.id == savedPlant.id)
+                                          .firstOrNull ??
                                       savedPlant;
 
                             return _PlantHeader(
                               name:
+                                  currentPlant?.displayName ??
                                   details?.commonName ??
                                   preview?.commonName ??
                                   '',
@@ -196,26 +195,23 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                               family: details?.family,
                               onEditPhoto: currentPlant == null
                                   ? null
-                                  : () => changePlantPhoto(
-                                      context,
-                                      currentPlant,
-                                    ),
+                                  : () =>
+                                        changePlantPhoto(context, currentPlant),
                             );
                           },
                         );
                       },
                     ),
 
-
                     const SizedBox(height: 24),
 
-                    // Loading indicator.
+                    // Loading Perenual details.
                     if (snapshot.connectionState != ConnectionState.done)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 32),
                         child: Center(child: CircularProgressIndicator()),
                       )
-                    // API error.
+                    // Error while loading care details.
                     else if (snapshot.hasError)
                       _ErrorPanel(
                         message: snapshot.error is PerenualException
@@ -223,7 +219,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                             : 'Could not load care details.',
                         onRetry: () => setState(_load),
                       )
-                    // Full care details.
+                    // Display full plant details.
                     else if (details != null) ...[
                       FutureBuilder<WikipediaExtras>(
                         future: _wikipedia,
@@ -240,42 +236,42 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
 
                       const SizedBox(height: 20),
 
+                      // Plant care information.
                       PlantCareGuide(
                         details: details,
                         wikipedia: _wikipedia,
                         collapsible: widget.collapseCare,
                       ),
 
-                      // Existing Health History feature.
-                   
-                      // Health analysis and history for saved plants.
-                      if (widget.fromMyPlants && currentUserId() != null) ...[
+                      // Health History for saved plants.
+                      if (widget.fromMyPlants && userId != null) ...[
                         const SizedBox(height: 28),
-                          Theme(
-                            data: healthHistoryTheme,
-                            child: HealthHistory(
-                              userId: currentUserId()!,
-                              plantId: '${details.id}',
-                              onRunAnalysis: widget.savedPlant == null
-                                  ? null
-                                  : () async {
-                                      await Navigator.of(context).push<bool>(
-                                        MaterialPageRoute(
-                                          builder: (context) => Scaffold(
-                                            appBar: AppBar(
-                                              title: const Text('New Health Analysis'),
-                                            ),
-                                            body: UploadScreen(
-                                              targetPlant: widget.savedPlant,
+                        Theme(
+                          data: healthHistoryTheme,
+                          child: HealthHistory(
+                            userId: userId,
+                            plantId: widget.savedPlant?.id ?? '${details.id}',
+                            onRunAnalysis: widget.savedPlant == null
+                                ? null
+                                : () async {
+                                    await Navigator.of(context).push<bool>(
+                                      MaterialPageRoute(
+                                        builder: (context) => Scaffold(
+                                          appBar: AppBar(
+                                            title: const Text(
+                                              'New Health Analysis',
                                             ),
                                           ),
+                                          body: UploadScreen(
+                                            targetPlant: widget.savedPlant,
+                                          ),
                                         ),
-                                      );
-                                    },
-                            ),
+                                      ),
+                                    );
+                                  },
                           ),
+                        ),
                       ],
-
                     ],
                   ],
                 ),
@@ -288,8 +284,7 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
   }
 }
 
-// Displays the plant photo, name, scientific name,
-// and family.
+// Plant picture, common name, scientific name, and family.
 class _PlantHeader extends StatelessWidget {
   const _PlantHeader({
     required this.name,
@@ -336,7 +331,7 @@ class _PlantHeader extends StatelessWidget {
           ),
         ],
 
-        if (family != null) ...[
+        if (family != null && family!.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
             'Family: $family',
@@ -364,15 +359,14 @@ class _PlantHeader extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Side-by-side on wider screens.
+          // Wider screens: picture beside plant information.
           if (constraints.maxWidth >= 480) {
             return Row(
               children: [
-               Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PlantThumbnail(url: imageUrl, size: 140),
-
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PlantThumbnail(url: imageUrl, size: 140),
                     if (onEditPhoto != null)
                       TextButton.icon(
                         onPressed: onEditPhoto,
@@ -383,12 +377,13 @@ class _PlantHeader extends StatelessWidget {
                 ),
 
                 const SizedBox(width: 20),
+
                 Expanded(child: info),
               ],
             );
           }
 
-          // Stacked layout on smaller phones.
+          // Smaller phones: picture above plant information.
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -418,12 +413,11 @@ class _PlantHeader extends StatelessWidget {
   }
 }
 
-// Add / Remove My Plants.
+// Add or remove a plant from My Plants.
 class _MyPlantButton extends StatefulWidget {
   const _MyPlantButton({required this.details, this.wateringReference});
 
   final PlantDetails details;
-
   final ({String source, String text})? wateringReference;
 
   @override
@@ -506,7 +500,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
     }
   }
 
-  // Remove the plant from My Plants.
+  // Remove plant from saved collection.
   Future<void> _remove() async {
     setState(() {
       _isBusy = true;
@@ -561,7 +555,6 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
                 icon: const Icon(Icons.check),
                 label: const Text('In My Plants - Remove'),
               ),
-
               TextButton(
                 onPressed: () => HomeTabs.goTo(context, HomeTabs.myPlants),
                 child: const Text('View My Plants'),
@@ -579,7 +572,7 @@ class _MyPlantButtonState extends State<_MyPlantButton> {
   }
 }
 
-// Dialog for adding a plant to the user's collection.
+// Dialog for adding a plant to My Plants.
 class _AddPlantDialog extends StatefulWidget {
   const _AddPlantDialog({
     required this.plantName,
@@ -613,7 +606,6 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
     super.dispose();
   }
 
-  // Send the user's input back to the Add button.
   void _submit() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -696,19 +688,16 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
                           'set one later from My Plants.',
               ),
 
-              // Display Wikipedia watering advice if
-              // Perenual has no schedule.
+              // Show Wikipedia watering advice if Perenual
+              // does not provide a suggested schedule.
               if (reference != null &&
                   widget.suggestedWaterEveryDays == null) ...[
                 const SizedBox(height: 12),
-
                 Text(
                   '${reference.source} says:',
                   style: textTheme.labelSmall?.copyWith(color: textColor),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
                   reference.text,
                   maxLines: 6,
@@ -728,7 +717,6 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: PlantPalColors.forest,
@@ -742,7 +730,7 @@ class _AddPlantDialogState extends State<_AddPlantDialog> {
   }
 }
 
-// Error panel for failed Perenual requests.
+// Error panel for a failed Perenual request.
 class _ErrorPanel extends StatelessWidget {
   const _ErrorPanel({required this.message, required this.onRetry});
 
@@ -760,17 +748,13 @@ class _ErrorPanel extends StatelessWidget {
             size: 48,
             color: PlantPalColors.accent(context),
           ),
-
           const SizedBox(height: 12),
-
           Text(
             message,
             textAlign: TextAlign.center,
             style: TextStyle(color: PlantPalColors.text(context)),
           ),
-
           const SizedBox(height: 16),
-
           FilledButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),

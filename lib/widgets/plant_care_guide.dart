@@ -539,8 +539,9 @@ class _PlantThumbnailWithFallbackState
 
   @override
   Widget build(BuildContext context) {
-    if (_wiki == null)
+    if (_wiki == null) {
       return PlantThumbnail(url: widget.url, size: widget.size);
+    }
     return FutureBuilder<WikipediaSummary?>(
       future: _wiki,
       builder: (context, snapshot) =>

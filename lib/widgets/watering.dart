@@ -41,13 +41,13 @@ class WateringColorGuide extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     Widget item(Color color, String label) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.water_drop, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(label, style: textTheme.bodySmall),
-          ],
-        );
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.water_drop, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: textTheme.bodySmall),
+      ],
+    );
 
     return Wrap(
       spacing: 16,
@@ -279,7 +279,8 @@ class WateringRemindersCard extends StatelessWidget {
           child: ReminderCard(
             icon: Icons.water_drop,
             iconColor: wateringColor(plant.daysUntilWatering()),
-            message: '${wateringStatus(plant)}: ${plant.displayName}'
+            message:
+                '${wateringStatus(plant)}: ${plant.displayName}'
                 '${plant.nickname != null ? ' (${plant.commonName})' : ''}',
             onChanged: (checked) {
               if (checked == true) {
