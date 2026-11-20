@@ -112,9 +112,13 @@ class ReminderCard extends StatelessWidget {
     this.onChanged,
     this.icon = Icons.local_florist,
     this.iconColor,
+    this.heading,
   });
 
   final String message;
+
+  // bold line above the message, e.g. "Water today"
+  final String? heading;
   final bool isChecked;
   final ValueChanged<bool?>? onChanged;
   final IconData icon;
@@ -138,7 +142,30 @@ class ReminderCard extends StatelessWidget {
             ),
 
             Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 14)),
+              child: heading == null
+                  ? Text(message, style: const TextStyle(fontSize: 14))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          heading!,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          message,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
             Checkbox(value: isChecked, onChanged: onChanged),
           ],
@@ -223,6 +250,14 @@ class PlantCard extends StatelessWidget {
   }
 }
 
+/// Care topic titles ("Water", "Light") are bold and green so they stand out
+/// from the tip text under them.
+TextStyle? careTopicStyle(BuildContext context) =>
+    Theme.of(context).textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: Theme.of(context).colorScheme.primary,
+    );
+
 class PlantCareFact extends StatelessWidget {
   const PlantCareFact({
     super.key,
@@ -248,7 +283,7 @@ class PlantCareFact extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                Text(title, style: careTopicStyle(context)),
                 const SizedBox(height: 4),
                 Text(description),
               ],

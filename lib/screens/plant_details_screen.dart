@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/my_plant.dart';
 import '../models/perenual_models.dart';
+import '../services/care_ai_service.dart';
 import '../services/database_service.dart';
 import '../services/perenual_service.dart';
 import '../theme/plantpal_colors.dart';
@@ -227,15 +228,28 @@ class _PlantDetailsScreenState extends State<PlantDetailsScreen> {
                     else if (details != null) ...[
                       FutureBuilder<WikipediaExtras>(
                         future: _wikipedia,
-                        builder: (context, wiki) {
-                          return _MyPlantButton(
-                            details: details,
-                            wateringReference: wateringReference(
-                              details,
-                              wiki.data,
+                        // same tips as the care guide (saved, not asked again)
+                        builder: (context, wiki) =>
+                            FutureBuilder<Map<String, String>>(
+                              future:
+                                  wiki.connectionState == ConnectionState.done
+                                  ? CareTipsService.instance.tipsFor(
+                                      scientificName: details.scientificName,
+                                      sources: careTipSources(
+                                        details,
+                                        wiki.data,
+                                      ),
+                                    )
+                                  : null,
+                              builder: (context, tips) => _MyPlantButton(
+                                details: details,
+                                wateringReference: wateringReference(
+                                  details,
+                                  wiki.data,
+                                  tips.data,
+                                ),
+                              ),
                             ),
-                          );
-                        },
                       ),
 
                       const SizedBox(height: 20),

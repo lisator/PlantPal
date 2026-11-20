@@ -33,8 +33,13 @@ Color? wateringColor(int? daysUntilWatering) {
 }
 
 /// Legend explaining the watering colors on plant cards.
+///
+/// reminder lists only hold plants that need water, so blue is hidden there.
+/// set [showOnTrack] on lists that also show plants that aren't due yet.
 class WateringColorGuide extends StatelessWidget {
-  const WateringColorGuide({super.key});
+  const WateringColorGuide({super.key, this.showOnTrack = false});
+
+  final bool showOnTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +58,7 @@ class WateringColorGuide extends StatelessWidget {
       spacing: 16,
       runSpacing: 4,
       children: [
+        if (showOnTrack) item(wateringBlue, 'Not due yet'),
         item(wateringYellow, 'Due today or tomorrow'),
         item(wateringRed, 'Overdue'),
       ],
@@ -279,7 +285,8 @@ class WateringRemindersCard extends StatelessWidget {
           child: ReminderCard(
             icon: Icons.water_drop,
             iconColor: wateringColor(plant.daysUntilWatering()),
-            message: '${wateringStatus(plant)}: ${plant.displayName}'
+            heading: wateringStatus(plant),
+            message: '${plant.displayName}'
                 '${plant.nickname != null ? ' (${plant.commonName})' : ''}',
             onChanged: (checked) {
               if (checked == true) {
@@ -325,10 +332,6 @@ class WateringRemindersCard extends StatelessWidget {
             ),
           ],
         ),
-      if (scheduled.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        const WateringColorGuide(),
-      ],
     ];
 
     return Column(

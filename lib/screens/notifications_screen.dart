@@ -767,11 +767,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           if (watering.isEmpty) const Text('No watering reminders are due.'),
 
           ...watering.map((reminder) => _reminderCard(userId, reminder)),
-
-          if (watering.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            const WateringColorGuide(),
-          ],
         ],
 
         // PLANT PROGRESS REMINDERS
