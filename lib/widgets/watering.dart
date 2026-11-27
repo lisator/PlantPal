@@ -46,13 +46,13 @@ class WateringColorGuide extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     Widget item(Color color, String label) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.water_drop, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(label, style: textTheme.bodySmall),
-          ],
-        );
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.water_drop, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: textTheme.bodySmall),
+      ],
+    );
 
     return Wrap(
       spacing: 16,

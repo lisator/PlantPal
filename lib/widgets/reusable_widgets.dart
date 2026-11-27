@@ -43,6 +43,7 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
 
+          // Profile
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
             title: const Text('Profile'),
@@ -55,6 +56,7 @@ class AppDrawer extends StatelessWidget {
             },
           ),
 
+          // Settings
           ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: const Text('Settings'),
@@ -64,7 +66,7 @@ class AppDrawer extends StatelessWidget {
               // Close the sidebar.
               navigator.pop();
 
-              // Open the real Settings screen.
+              // Open the Settings screen.
               navigator.push(
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
@@ -73,6 +75,7 @@ class AppDrawer extends StatelessWidget {
 
           const Divider(),
 
+          // Log Out
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Log Out'),
@@ -104,6 +107,7 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
+// Reusable reminder card.
 class ReminderCard extends StatelessWidget {
   const ReminderCard({
     super.key,
@@ -132,14 +136,10 @@ class ReminderCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: iconColor,
-            ),
+            // Customizable reminder icon.
+            Icon(icon, color: iconColor),
 
-            const SizedBox(
-              width: 12,
-            ),
+            const SizedBox(width: 12),
 
             Expanded(
               child: heading == null
@@ -167,6 +167,7 @@ class ReminderCard extends StatelessWidget {
                       ],
                     ),
             ),
+
             Checkbox(value: isChecked, onChanged: onChanged),
           ],
         ),
@@ -175,6 +176,7 @@ class ReminderCard extends StatelessWidget {
   }
 }
 
+// Reusable plant card.
 class PlantCard extends StatelessWidget {
   const PlantCard({
     super.key,
@@ -209,7 +211,9 @@ class PlantCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
+
                 const SizedBox(width: 12),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,22 +225,28 @@ class PlantCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
+
                       Text(
                         plant.species,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+
                       if (!compact) ...[
                         const SizedBox(height: 10),
+
                         if (plant.location != null)
                           Text('Location: ${plant.location}'),
+
                         const SizedBox(height: 4),
+
                         Text(plant.wateringNote),
                       ],
                     ],
                   ),
                 ),
+
                 if (onTap != null) ...[
                   const SizedBox(width: 8),
                   const Icon(Icons.chevron_right),
@@ -278,13 +288,16 @@ class PlantCareFact extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: Theme.of(context).colorScheme.primary),
+
           const SizedBox(width: 14),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: careTopicStyle(context)),
                 const SizedBox(height: 4),
+
                 Text(description),
               ],
             ),

@@ -7,11 +7,11 @@ import '../models/my_plant.dart';
 import '../services/database_service.dart';
 import '../services/notification_service.dart';
 import '../services/plant_reminder_service.dart';
+import '../widgets/watering.dart';
 
 import 'home_screen.dart';
 import 'my_plants_screen.dart';
 import 'user_profile_screen.dart';
-import '../widgets/watering.dart';
 
 // Extra information displayed inside activity notifications.
 class _ActivityDetails {
@@ -38,17 +38,12 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-
   final NotificationService _notifications = NotificationService();
-
   final PlantReminderService _reminders = PlantReminderService();
-
   final DatabaseService _database = DatabaseService();
-
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   final Set<String> _selected = {};
-
   final Map<String, Future<_ActivityDetails>> _detailsCache = {};
 
   bool _selectionMode = false;
@@ -59,7 +54,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Stream<List<MyPlant>>? _plantStream;
   Stream<List<AppNotification>>? _activityStream;
   Stream<Map<String, String>>? _dismissedStream;
-
   Stream<DocumentSnapshot<Map<String, dynamic>>>? _settingsStream;
 
   // Theme-aware colors for light and dark mode.
@@ -75,18 +69,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Color get _borderColor => Theme.of(context).colorScheme.outlineVariant;
 
-  // Set up the Firestore streams for the signed-in user.
+  // Set up Firestore streams for the signed-in user.
   void _initializeStreams(String userId) {
     if (_streamUserId == userId) return;
 
     _streamUserId = userId;
 
     _plantStream = _database.getMyPlants(userId);
-
     _activityStream = _notifications.watchNotifications(userId);
-
     _dismissedStream = _notifications.watchDismissedReminders(userId);
-
     _settingsStream = _db.collection('users').doc(userId).snapshots();
 
     _detailsCache.clear();
@@ -192,11 +183,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .get();
 
         final data = doc.data() ?? {};
-
         final username = (data['username'] ?? '').toString().trim();
-
         final displayName = (data['displayName'] ?? '').toString().trim();
-
         final email = (data['email'] ?? '').toString().trim();
 
         name = username.isNotEmpty
@@ -286,7 +274,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // Cache activity details so they aren't loaded repeatedly.
+  // Cache activity details so they are not loaded repeatedly.
   Future<_ActivityDetails> _detailsFor(
     AppNotification notification,
     String userId,
@@ -375,7 +363,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return '${date.month}/${date.day}/${date.year}';
   }
 
-  // Open the specific plant associated with a reminder.
+  // Open a specific plant associated with a reminder.
   Future<void> _openPlant(String userId, String plantId) async {
     try {
       final doc = await _db
@@ -488,7 +476,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       future: _detailsFor(notification, userId),
       builder: (context, snapshot) {
         final details = snapshot.data ?? const _ActivityDetails();
-
         final preview = _shortPreview(details.preview);
 
         return Card(
@@ -538,9 +525,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-
                 Text(_activityMessage(notification, details)),
-
                 if (preview.isNotEmpty) ...[
                   const SizedBox(height: 5),
                   Text(
@@ -550,9 +535,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
                 ],
-
                 const SizedBox(height: 6),
-
                 Text(
                   _timeAgo(notification.createdAt),
                   style: TextStyle(color: _primaryColor, fontSize: 12),
@@ -710,7 +693,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ? activities.where((activity) => activity.type != 'analysis').toList()
         : <AppNotification>[];
 
-    // Plant analysis notifications remain separate
+    // Plant analysis notifications are separate
     // from the Community preference.
     final analysisActivities = activities
         .where((activity) => activity.type == 'analysis')
@@ -885,7 +868,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // New settings stream.
                 return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                   stream: _settingsStream,
                   builder: (context, settingsSnapshot) {
@@ -935,7 +917,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     final userId = user.uid;
-
     _initializeStreams(userId);
 
     return Scaffold(
