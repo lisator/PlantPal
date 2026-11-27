@@ -689,6 +689,32 @@ class DatabaseService {
         .update({'waterEveryDays': days});
   }
 
+  // RECENT PLANT SEARCHES
+
+  // one private doc per user, newest search first
+  DocumentReference<Map<String, dynamic>> _recentSearchesDoc(String userId) =>
+      _db
+          .collection('users')
+          .doc(userId)
+          .collection('recentSearches')
+          .doc('list');
+
+  Future<List<String>> getRecentSearches(String userId) async {
+    final data = (await _recentSearchesDoc(userId).get()).data();
+    final queries = data?['queries'];
+    return queries is List ? queries.whereType<String>().toList() : [];
+  }
+
+  Future<void> setRecentSearches({
+    required String userId,
+    required List<String> queries,
+  }) async {
+    await _recentSearchesDoc(userId).set({
+      'queries': queries,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Stream<List<MyPlant>> getMyPlants(String userId) {
     return _db
         .collection('users')

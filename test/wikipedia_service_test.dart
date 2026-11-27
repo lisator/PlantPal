@@ -165,5 +165,75 @@ It tolerates low light conditions.
         isEmpty,
       );
     });
+
+    test('does not add advice from an outdoor paragraph', () {
+      // from the monstera article: the second paragraph is about gardens,
+      // but only its first sentence says so.
+      final excerpts = extractCareExcerpts('''
+== Cultivation ==
+It is commonly grown outdoors in the tropics. It needs to be watered just to keep the soil slightly moist.
+It is widely cultivated indoors. It is usually watered when the soil has slightly dried out.
+''');
+
+      expect(excerpts[CareTopic.water],
+          'It is usually watered when the soil has slightly dried out.');
+    });
+
+    test('uses outdoor advice when nothing else covers the topic', () {
+      final excerpts = extractCareExcerpts('''
+== Cultivation ==
+When grown outdoors, it prefers part shade to full shade.
+''');
+
+      expect(excerpts[CareTopic.light], startsWith('When grown outdoors'));
+    });
+  });
+
+  group('cleanArticleText', () {
+    test('removes editor notes and footnote marks', () {
+      expect(
+        cleanArticleText(
+          'Currently [when?] about 40 are grown [citation needed]. '
+          'It likes shade[1] and moist soil [a] ( ).',
+        ),
+        'Currently about 40 are grown. It likes shade and moist soil.',
+      );
+    });
+
+    test('keeps brackets that are part of the text', () {
+      expect(cleanArticleText('Called [ʔolˈʔæːs] locally.'),
+          'Called [ʔolˈʔæːs] locally.');
+      expect(cleanArticleText('An area of 170 m2 [1,800 sq ft].'),
+          'An area of 170 m2 [1,800 sq ft].');
+    });
+
+    test('careParagraphs returns cleaned text', () {
+      final text = careSectionsText(
+        '== Cultivation ==\nIt prefers  bright light[2] .',
+      );
+      expect(text, 'It prefers bright light.');
+    });
+  });
+
+  group('splitSentences', () {
+    test('splits at sentence ends', () {
+      expect(splitSentences('It likes sun. Water weekly! Is it toxic? No.'),
+          ['It likes sun.', 'Water weekly!', 'Is it toxic?', 'No.']);
+    });
+
+    test('does not split after initials or abbreviations', () {
+      // from the peperomia article
+      expect(
+        splitSentences(
+          'Species include P. quadrangularis (syn. P. angulata) and P. rugosa. '
+          'Use bark, e.g. Orchid bark, cf. Monstera. It grows fast.',
+        ),
+        [
+          'Species include P. quadrangularis (syn. P. angulata) and P. rugosa.',
+          'Use bark, e.g. Orchid bark, cf. Monstera.',
+          'It grows fast.',
+        ],
+      );
+    });
   });
 }

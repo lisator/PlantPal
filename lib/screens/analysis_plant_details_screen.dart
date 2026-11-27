@@ -261,20 +261,19 @@ class _AnalysisCareGuideState extends State<_AnalysisCareGuide> {
     );
   }
 
-  PlantDetails get _namesOnly => PlantDetails.basic(
-    PlantSearchResult(
-      id: -1,
-      commonName: widget.plant.commonName,
-      scientificName: widget.plant.scientificName,
-    ),
+  /// Names only, for plants Perenual doesn't have, so Wikipedia can still
+  /// be searched.
+  // not marked limited, so no "not in our perenual plan" note shows
+  PlantDetails get _namesOnly => PlantDetails(
+    id: -1,
+    commonName: widget.plant.commonName,
+    scientificName: widget.plant.scientificName,
   );
 
+  /// Where the care info comes from, when it's another plant's Perenual
+  /// entry. Plants Perenual doesn't have get no note.
   String? _note(PlantDetails? found) {
-    if (found == null) {
-      return 'This plant isn\'t in our plant database '
-          '(Perenual), so care info comes from Wikipedia.';
-    }
-
+    if (found == null) return null;
     final identified = widget.plant.scientificName.toLowerCase();
     final foundName = found.scientificName.toLowerCase();
 

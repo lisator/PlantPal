@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/perenual_models.dart';
+import '../services/care_ai_service.dart';
 import '../services/wikipedia_service.dart';
 import 'reusable_widgets.dart';
 
@@ -42,6 +43,21 @@ String? perenualCare(PlantDetails details, CareTopic topic) {
       return details.soil.isEmpty ? null : details.soil.join(', ');
   }
 }
+
+/// The text each care tip is rewritten from: Perenual's when it has one,
+/// otherwise the Wikipedia excerpt. Keys are "water", "light", "soil" and
+/// "pruning".
+Map<String, String> careTipSources(
+  PlantDetails details,
+  WikipediaExtras? extras,
+) => {
+  for (final topic in CareTopic.values)
+    if ((perenualCare(details, topic) ?? extras?.care[topic]?.text)
+        case final String text)
+      topic.name: text,
+  if (details.careGuide['pruning'] case final String pruning)
+    'pruning': pruning,
+};
 
 /// Perenual comes first; Wikipedia is only looked up for what Perenual is
 /// missing (a description, an image, or Water/Light/Soil). Never throws.
@@ -86,15 +102,18 @@ Future<WikipediaExtras> loadWikipediaFor({
 }
 
 /// Watering guidance shown while choosing a schedule: Perenual's text, else
-/// the Wikipedia excerpt. It's only a reference; the user picks the number.
+/// the Wikipedia excerpt, shortened to the water tip from [tips] when there
+/// is one. It's only a reference; the user picks the number.
 ({String source, String text})? wateringReference(
   PlantDetails details,
-  WikipediaExtras? extras,
-) {
+  WikipediaExtras? extras, [
+  Map<String, String>? tips,
+]) {
+  final tip = tips?['water'];
   final perenual = perenualCare(details, CareTopic.water);
-  if (perenual != null) return (source: 'Perenual', text: perenual);
+  if (perenual != null) return (source: 'Perenual', text: tip ?? perenual);
   final wiki = extras?.care[CareTopic.water];
-  return wiki == null ? null : (source: 'Wikipedia', text: wiki.text);
+  return wiki == null ? null : (source: 'Wikipedia', text: tip ?? wiki.text);
 }
 
 /// The "About" and "Care guide" sections for a plant, shared by the plant
@@ -136,22 +155,34 @@ class PlantCareGuide extends StatelessWidget {
 
   /// Perenual's field when it has one, then a quoted Wikipedia excerpt, then
   /// a "not available" note. Wikipedia text is never turned into a value.
+  /// A short [tips] rewrite replaces the source's text once it's ready.
   Widget _careRow(
     CareTopic topic,
     IconData icon,
     String title,
-    AsyncSnapshot<WikipediaExtras> wiki,
-  ) {
+    AsyncSnapshot<WikipediaExtras> wiki, [
+    Map<String, String>? tips,
+  ]) {
+    final tip = tips?[topic.name];
     final perenual = perenualCare(details, topic);
     if (perenual != null) {
-      return PlantCareFact(icon: icon, title: title, description: perenual);
+      return PlantCareFact(
+        icon: icon,
+        title: title,
+        description: tip ?? perenual,
+      );
     }
     if (wiki.connectionState != ConnectionState.done) {
       return _LoadingCareRow(icon: icon, title: title);
     }
     final excerpt = wiki.data?.care[topic];
     if (excerpt != null) {
-      return WikipediaCareFact(icon: icon, title: title, excerpt: excerpt);
+      return WikipediaCareFact(
+        icon: icon,
+        title: title,
+        excerpt: excerpt,
+        summary: tip,
+      );
     }
     return PlantCareFact(
       icon: icon,
@@ -171,7 +202,8 @@ class PlantCareGuide extends StatelessWidget {
         <({IconData icon, List<String> titles, CareExcerpt excerpt})>[];
     final combined = <Object>[];
     for (final row in careRows) {
-      if (row is! WikipediaCareFact) {
+      // rewritten tips each have their own text, so they're never combined
+      if (row is! WikipediaCareFact || row.summary != null) {
         combined.add(row);
         continue;
       }
@@ -247,82 +279,111 @@ class PlantCareGuide extends StatelessWidget {
 
     return FutureBuilder<WikipediaExtras>(
       future: wikipedia,
-      builder: (context, wiki) {
-        final article = wiki.data?.article;
-        final description = details.description ?? article?.extract;
-        final rows = [
-          ..._combineDuplicateExcerpts([
-            _careRow(CareTopic.water, Icons.water_drop_outlined, 'Water', wiki),
-            _careRow(CareTopic.light, Icons.wb_sunny_outlined, 'Light', wiki),
-            _careRow(CareTopic.soil, Icons.grass, 'Soil', wiki),
-          ]),
-          for (final fact in otherFacts)
-            PlantCareFact(icon: fact.$1, title: fact.$2, description: fact.$3!),
-        ];
+      // once wikipedia is done, the long care text is rewritten into short
+      // tips. the original text shows until then, or if that fails.
+      builder: (context, wiki) => FutureBuilder<Map<String, String>>(
+        future: wiki.connectionState == ConnectionState.done
+            ? CareTipsService.instance.tipsFor(
+                scientificName: details.scientificName,
+                sources: careTipSources(details, wiki.data),
+              )
+            : null,
+        builder: (context, tipsSnapshot) {
+          final tips = tipsSnapshot.data;
+          final article = wiki.data?.article;
+          final description = details.description ?? article?.extract;
+          final rows = [
+            ..._combineDuplicateExcerpts([
+              _careRow(
+                CareTopic.water,
+                Icons.water_drop_outlined,
+                'Water',
+                wiki,
+                tips,
+              ),
+              _careRow(
+                CareTopic.light,
+                Icons.wb_sunny_outlined,
+                'Light',
+                wiki,
+                tips,
+              ),
+              _careRow(CareTopic.soil, Icons.grass, 'Soil', wiki, tips),
+            ]),
+            for (final fact in otherFacts)
+              PlantCareFact(
+                icon: fact.$1,
+                title: fact.$2,
+                description: fact.$2 == 'Pruning'
+                    ? (tips?['pruning'] ?? fact.$3!)
+                    : fact.$3!,
+              ),
+          ];
 
-        // care guide body: optional source note, then the care rows
-        final careContent = <Widget>[
-          if (note != null || details.isLimited)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                note ??
-                    'Care details for this plant are not included in our '
-                        'current Perenual plan, so Wikipedia is used instead.',
+          // care guide body: optional source note, then the care rows
+          final careContent = <Widget>[
+            if (note != null || details.isLimited)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  note ??
+                      'Care details for this plant are not included in our '
+                          'current Perenual plan, so Wikipedia is used instead.',
+                  style: textTheme.bodySmall,
+                ),
+              ),
+            const SizedBox(height: 8),
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const Divider(height: 1),
+              rows[i],
+            ],
+          ];
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (tags.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [for (final tag in tags) Chip(label: Text(tag))],
+                ),
+                const SizedBox(height: 20),
+              ],
+              if (collapsible) ...[
+                // tap a heading to open/close it
+                if (description != null)
+                  _CollapsibleSection(
+                    title: 'About',
+                    children: [Text(description)],
+                  ),
+                _CollapsibleSection(
+                  title: 'Care guide',
+                  subtitle: 'Water, light, soil and more',
+                  children: careContent,
+                ),
+              ] else ...[
+                if (description != null) ...[
+                  Text('About', style: textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  Text(description),
+                  const SizedBox(height: 24),
+                ],
+                Text('Care guide', style: textTheme.titleLarge),
+                ...careContent,
+              ],
+              const SizedBox(height: 16),
+              Text(
+                article == null
+                    ? 'Plant data from Perenual'
+                    : 'Plant data from Perenual. Additional text and images from '
+                          'Wikipedia (CC BY-SA): ${article.pageUrl}',
                 style: textTheme.bodySmall,
               ),
-            ),
-          const SizedBox(height: 8),
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) const Divider(height: 1),
-            rows[i],
-          ],
-        ];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (tags.isNotEmpty) ...[
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [for (final tag in tags) Chip(label: Text(tag))],
-              ),
-              const SizedBox(height: 20),
             ],
-            if (collapsible) ...[
-              // tap a heading to open/close it
-              if (description != null)
-                _CollapsibleSection(
-                  title: 'About',
-                  children: [Text(description)],
-                ),
-              _CollapsibleSection(
-                title: 'Care guide',
-                subtitle: 'Water, light, soil and more',
-                children: careContent,
-              ),
-            ] else ...[
-              if (description != null) ...[
-                Text('About', style: textTheme.titleLarge),
-                const SizedBox(height: 8),
-                Text(description),
-                const SizedBox(height: 24),
-              ],
-              Text('Care guide', style: textTheme.titleLarge),
-              ...careContent,
-            ],
-            const SizedBox(height: 16),
-            Text(
-              article == null
-                  ? 'Plant data from Perenual'
-                  : 'Plant data from Perenual. Additional text and images from '
-                        'Wikipedia (CC BY-SA): ${article.pageUrl}',
-              style: textTheme.bodySmall,
-            ),
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -370,7 +431,7 @@ class _LoadingCareRow extends StatelessWidget {
         children: [
           Icon(icon, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 14),
-          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          Text(title, style: careTopicStyle(context)),
           const SizedBox(width: 12),
           const SizedBox.square(
             dimension: 16,
@@ -390,11 +451,15 @@ class WikipediaCareFact extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.excerpt,
+    this.summary,
   });
 
   final IconData icon;
   final String title;
   final CareExcerpt excerpt;
+
+  // short tip rewritten from the excerpt; shown instead of the quote
+  final String? summary;
 
   WikipediaSummary get article => excerpt.article;
 
@@ -426,29 +491,38 @@ class WikipediaCareFact extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: textTheme.titleSmall),
-                const SizedBox(height: 2),
-                Text(
-                  excerpt.sourceLabel,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
+                Text(title, style: careTopicStyle(context)),
+                // a rewritten tip has no label, just the link below
+                if (summary == null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    excerpt.sourceLabel,
+                    style: textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.only(left: 10),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(color: colors.outlineVariant, width: 3),
+                if (summary != null)
+                  Text(summary!)
+                else
+                  Container(
+                    padding: const EdgeInsets.only(left: 10),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: colors.outlineVariant,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      excerpt.text,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    excerpt.text,
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
                 TextButton.icon(
                   onPressed: () => _openArticle(context),
                   icon: const Icon(Icons.open_in_new, size: 16),

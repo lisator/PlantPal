@@ -1,7 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/perenual_models.dart';
+import '../services/database_service.dart';
 import '../services/perenual_service.dart';
 import '../theme/plantpal_colors.dart';
 import '../widgets/plant_care_guide.dart';
@@ -24,8 +25,7 @@ class _PlantSearchState extends State<PlantSearch> {
     'Aloe',
   ];
 
-  // Recent searches are saved on this device, newest first.
-  static const String _recentSearchesKey = 'recentSearches';
+  // Recent searches are saved to the user's account, newest first.
   static const int _maxRecentSearches = 6;
 
   final PerenualService _api = PerenualService.instance;
@@ -93,23 +93,35 @@ class _PlantSearchState extends State<PlantSearch> {
 
   // Load previous searches saved on this device.
   Future<void> _loadRecentSearches() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getStringList(_recentSearchesKey) ?? [];
-
+      final saved = await DatabaseService().getRecentSearches(userId);
       if (!mounted) return;
-
-      setState(() => _recentSearches = saved);
+      // keep anything searched while this was loading
+      setState(() {
+        _recentSearches = [
+          ..._recentSearches,
+          ...saved.where(
+            (s) => !_recentSearches.any(
+              (r) => r.toLowerCase() == s.toLowerCase(),
+            ),
+          ),
+        ].take(_maxRecentSearches).toList();
+      });
     } catch (e) {
       debugPrint('Recent searches error: $e');
     }
   }
 
   Future<void> _saveRecentSearches() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setStringList(_recentSearchesKey, _recentSearches);
+      await DatabaseService().setRecentSearches(
+        userId: userId,
+        queries: List.of(_recentSearches),
+      );
     } catch (e) {
       debugPrint('Recent searches error: $e');
     }

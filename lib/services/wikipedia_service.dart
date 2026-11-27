@@ -378,7 +378,7 @@ List<({String text, bool indoor})> careParagraphs(String article) {
       }
       continue;
     }
-    final text = line.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final text = cleanArticleText(line);
     if (inCareSection && text.isNotEmpty) {
       paragraphs.add((text: text, indoor: isIndoorSection));
     }
@@ -390,9 +390,32 @@ List<({String text, bool indoor})> careParagraphs(String article) {
 String careSectionsText(String article) =>
     careParagraphs(article).map((p) => p.text).join('\n');
 
-/// Splits [text] into sentences at ". ", "! " or "? " before a capital.
-List<String> splitSentences(String text) =>
-    text.trim().split(RegExp(r'(?<=[.!?])\s+(?=[A-Z])'));
+/// Removes editor notes ("[when?]", "[citation needed]"), footnote marks
+/// ("[1]", "[a]") and empty parentheses that plain-text Wikipedia leaves in.
+/// Other brackets, like pronunciations or "[1,800 sq ft]", are kept.
+String cleanArticleText(String text) => text
+    .replaceAll(_editorNote, '')
+    .replaceAll(RegExp(r'\(\s*[,;]?\s*\)'), '')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .replaceAll(RegExp(r'\s+(?=[.,;:!?)])'), '')
+    .trim();
+
+final RegExp _editorNote = RegExp(
+  r'\[(\d+|[a-z]|note \d+|[^\]]*\?'
+  r'|[^\]]*\b(needed|citation|verification|dubious|discuss|disputed|vague'
+  r'|clarify|clarification|removed|unreliable|original research)\b[^\]]*)\]',
+  caseSensitive: false,
+);
+
+/// Splits [text] into sentences at ". ", "! " or "? " before a capital, but
+/// not after an initial or abbreviation ("P. alata", "syn. P. rubella").
+List<String> splitSentences(String text) => text.trim().split(
+  RegExp(r'(?<=[.!?])(?<!' + _abbreviation + r')\s+(?=[A-Z])'),
+);
+
+const String _abbreviation =
+    r'\b(?:[A-Z]|e\.g|i\.e|syn|var|subsp|ssp|spp|sp|cv|cf|approx|ca|incl|fig'
+    r'|vs|St|Dr|Mt)\.';
 
 /// Backup for when [CareAiService] can't be reached: picks sentences about
 /// each [CareTopic] from a plain-text Wikipedia article, as written.
@@ -414,7 +437,11 @@ Map<CareTopic, String> extractCareExcerpts(String article) {
 
   for (final (:text, :indoor) in careParagraphs(article)) {
     final isIndoorSection = indoor;
-    for (final sentence in splitSentences(text)) {
+    final sentences = splitSentences(text);
+    // a paragraph that opens with "grown outdoors in the tropics" is outdoor
+    // advice even when its later sentences don't say so.
+    final isOutdoorParagraph = _isOutdoor(sentences.first);
+    for (final sentence in sentences) {
       if (sentence.length < _minSentenceLength ||
           sentence.length > _maxSentenceLength ||
           _skipSentence.hasMatch(sentence)) {
@@ -452,6 +479,7 @@ Map<CareTopic, String> extractCareExcerpts(String article) {
             sentence: sentence,
             score: score,
             indoor: isIndoorSection,
+            outdoor: isOutdoorParagraph || _isOutdoor(sentence),
           ));
         }
       }
@@ -461,9 +489,11 @@ Map<CareTopic, String> extractCareExcerpts(String article) {
   final excerpts = <CareTopic, String>{};
   for (final MapEntry(key: topic, value: options) in candidates.entries) {
     if (options.isEmpty) continue;
-    // Indoor sections first, then the best score, then the shorter sentence.
+    // Indoor sections first, then non-outdoor advice, then the best score,
+    // then the shorter sentence.
     options.sort((a, b) {
       if (a.indoor != b.indoor) return a.indoor ? -1 : 1;
+      if (a.outdoor != b.outdoor) return a.outdoor ? 1 : -1;
       if (a.score != b.score) return b.score.compareTo(a.score);
       return a.sentence.length.compareTo(b.sentence.length);
     });
@@ -471,6 +501,8 @@ Map<CareTopic, String> extractCareExcerpts(String article) {
     var excerpt = best.sentence;
     for (final next in options.skip(1)) {
       if (next.sentence == best.sentence) continue;
+      // outdoor advice is only a last resort, never an add-on.
+      if (next.outdoor) break;
       if (excerpt.length + next.sentence.length < _maxExcerptLength) {
         excerpt = '$excerpt ${next.sentence}';
       }
@@ -481,7 +513,10 @@ Map<CareTopic, String> extractCareExcerpts(String article) {
   return excerpts;
 }
 
-typedef _Candidate = ({String sentence, int score, bool indoor});
+typedef _Candidate = ({String sentence, int score, bool indoor, bool outdoor});
+
+bool _isOutdoor(String sentence) =>
+    _outdoorSentence.hasMatch(sentence) && !_indoorSentence.hasMatch(sentence);
 
 const int _minScore = 4;
 const int _minSentenceLength = 15;

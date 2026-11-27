@@ -211,7 +211,8 @@ class _MyPlantsScreenState extends State<MyPlantsScreen> {
                                       ),
                                 ),
                                 const SizedBox(height: 8),
-                                const WateringColorGuide(),
+
+                                const WateringColorGuide(showOnTrack: true),
                               ],
                             );
                           }
